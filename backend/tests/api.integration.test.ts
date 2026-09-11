@@ -7,7 +7,7 @@ import { AnalysisCache } from "../src/services/analysis-cache.js";
 import type { AnalysisResult } from "../src/types/analysis.js";
 import { psiErrorFixture, psiFixture } from "./fixtures/pagespeed.fixture.js";
 
-function buildServer(payload: unknown = psiFixture, failureMode: "http" | null = null) {
+function buildServer(payload: unknown = psiFixture, failureMode: "http" | "badrequest" | null = null) {
   let requestCount = 0;
   const fetchFn = async (
     _url: string | URL | Request,
@@ -20,6 +20,22 @@ function buildServer(payload: unknown = psiFixture, failureMode: "http" | null =
         status: 503,
         statusText: "Service Unavailable",
         text: async () => "backend down",
+        json: async () => ({})
+      } as unknown as Response;
+    }
+    if (failureMode === "badrequest") {
+      return {
+        ok: false,
+        status: 400,
+        statusText: "Bad Request",
+        text: async () =>
+          JSON.stringify({
+            error: {
+              code: 400,
+              status: "FAILED_DOCUMENT_REQUEST",
+              message: "Lighthouse returned an error"
+            }
+          }),
         json: async () => ({})
       } as unknown as Response;
     }
@@ -128,6 +144,16 @@ describe("POST /api/analyze", () => {
     expect(res.status).toBe(502);
     expect(typeof res.body.error).toBe("string");
     expect(res.body.error).not.toContain("api.test");
+    expect(res.body.error).toMatch(/indisponível|temporariamente/i);
+  });
+
+  it("explica quando a página não pôde ser analisada (CA-07)", async () => {
+    const { app } = buildServer(psiFixture, "badrequest");
+    const res = await request(app)
+      .post("/api/analyze")
+      .send({ url: "https://www.google.com", strategy: "mobile"});
+    expect(res.status).toBe(502);
+    expect(res.body.error).toMatch(/acessar a página|rastreadores/i);
   });
 
   it("converte erro em payload PSI em erro 502 com mensagem compreensível (CA-07)", async () => {

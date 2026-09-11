@@ -205,6 +205,31 @@ describe("API V2 (persistência), POST /api/analyze salva e endpoints de histór
     expect(saved).not.toBeNull();
   });
 
+  it("V3: persiste e retorna recomendações geradas pela IA", async () => {
+    const repo = new PrismaRepository(client);
+    const app = buildApp(repo);
+
+    const analyze = await request(app)
+      .post("/api/analyze")
+      .send({ url: "https://ia.com", strategy: "mobile" });
+
+    expect(analyze.status).toBe(200);
+    expect(Array.isArray(analyze.body.recommendations)).toBe(true);
+    expect(analyze.body.recommendations.length).toBeGreaterThan(0);
+
+    const unsized = analyze.body.recommendations.find(
+      (r: { targetId: string }) => r.targetId === "unsized-images"
+    );
+    expect(unsized).toBeDefined();
+    expect(unsized.priority).toBe("P0");
+    expect(unsized.cause).toMatch(/Causa provável/i);
+    expect(unsized.evidence.length).toBeGreaterThan(0);
+
+    const detail = await request(app).get(`/api/analyses/${analyze.body.id}`);
+    expect(detail.body.recommendations.length).toBeGreaterThan(0);
+    expect(detail.body.recommendations[0]!.title).toBeTruthy();
+  });
+
   it("lista sites e análises por site", async () => {
     const repo = new PrismaRepository(client);
     const app = buildApp(repo);
@@ -284,6 +309,9 @@ describe("API V2 (persistência), POST /api/analyze salva e endpoints de histór
     expect(report.text).toContain("Core Web Vitals");
     expect(report.text).toContain("Resumo executivo");
     expect(report.text).toContain("Problemas prioritários");
+    expect(report.text).toContain("Diagnóstico e recomendações (V3 — IA)");
+    expect(report.text).toContain("Causa provável");
+    expect(report.text).toContain("Plano de ação");
   });
 
   it("retorna 404 para análise inexistente", async () => {

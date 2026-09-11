@@ -60,6 +60,7 @@ export interface AnalysisResult {
   siteId?: string;
   site?: Pick<SiteRecord, "id" | "name" | "url">;
   fieldData?: FieldData | null;
+  recommendations?: Recommendation[];
 }
 
 export interface ApiError {
@@ -107,6 +108,7 @@ export interface AnalysisRecord {
   fieldData: FieldData | null;
   metrics: Metric[];
   audits: Audit[];
+  recommendations: Recommendation[];
 }
 
 export interface MetricComparison {
@@ -117,6 +119,21 @@ export interface MetricComparison {
   delta: number | null;
   pctChange: number | null;
   direction: "improved" | "regressed" | "unchanged" | "unknown";
+}
+
+/** V3: evidence-based recommendation. */
+export interface Recommendation {
+  targetType: "metric" | "audit" | "group";
+  targetId: string;
+  category: string;
+  priority: "P0" | "P1" | "P2";
+  title: string;
+  description: string;
+  cause: string;
+  recommendedFix: string;
+  expectedImpact: "high" | "medium" | "low";
+  suggestedFix?: string;
+  evidence: string[];
 }
 
 export interface ComparisonResult {

@@ -91,7 +91,17 @@ const messages: Record<Locale, Record<string, string>> = {
     "compare.empty": "Selecione duas análises para comparar.",
     "back": "Voltar",
     "field.title": "Dados reais (CrUX)",
-    "field.unavailable": "Dados de campo indisponíveis para esta URL."
+    "field.unavailable": "Dados de campo indisponíveis para esta URL.",
+    "rec.title": "Diagnóstico e recomendações",
+    "rec.subtitle": "Causas prováveis são hipóteses baseadas nas evidências; sugestões de código aparecem apenas quando há evidência suficiente.",
+    "rec.problem": "Problema",
+    "rec.cause": "Causa provável",
+    "rec.recommendation": "Recomendação",
+    "rec.evidence": "Evidências",
+    "rec.impact": "Impacto esperado",
+    "rec.impact.high": "Alto",
+    "rec.impact.medium": "Médio",
+    "rec.impact.low": "Baixo"
   },
   "en-US": {
     "app.title": "Web Performance Intelligence",
@@ -175,7 +185,17 @@ const messages: Record<Locale, Record<string, string>> = {
     "compare.empty": "Select two analyses to compare.",
     "back": "Back",
     "field.title": "Real data (CrUX)",
-    "field.unavailable": "Field data unavailable for this URL."
+    "field.unavailable": "Field data unavailable for this URL.",
+    "rec.title": "Diagnosis & recommendations",
+    "rec.subtitle": "Probable causes are hypotheses based on evidence; code suggestions appear only when there is enough evidence.",
+    "rec.problem": "Problem",
+    "rec.cause": "Probable cause",
+    "rec.recommendation": "Recommendation",
+    "rec.evidence": "Evidence",
+    "rec.impact": "Expected impact",
+    "rec.impact.high": "High",
+    "rec.impact.medium": "Medium",
+    "rec.impact.low": "Low"
   }
 };
 

@@ -20,12 +20,38 @@ export class PageSpeedHttpError extends Error {
   readonly status: number;
   readonly statusText: string;
   readonly body: string;
+  /** Error status from the Google API error payload, e.g. FAILED_DOCUMENT_REQUEST */
+  readonly apiStatus: string | null;
+  readonly apiCode: number | null;
+  readonly apiMessage: string | null;
   constructor(status: number, statusText: string, body: string) {
     super(`PageSpeed API returned HTTP ${status} ${statusText}`);
     this.name = "PageSpeedHttpError";
     this.status = status;
     this.statusText = statusText;
     this.body = body;
+    this.apiStatus = PageSpeedHttpError.parseBody(body).status;
+    this.apiCode = PageSpeedHttpError.parseBody(body).code;
+    this.apiMessage = PageSpeedHttpError.parseBody(body).message;
+  }
+
+  private static parseBody(body: string): {
+    status: string | null;
+    code: number | null;
+    message: string | null;
+  } {
+    try {
+      const parsed = JSON.parse(body) as {
+        error?: { code?: number; status?: string; message?: string };
+      };
+      return {
+        status: parsed.error?.status ?? null,
+        code: parsed.error?.code ?? null,
+        message: parsed.error?.message ?? null
+      };
+    } catch {
+      return { status: null, code: null, message: null };
+    }
   }
 }
 

@@ -63,9 +63,31 @@ export function errorHandler(
   }
 
   if (err instanceof PageSpeedHttpError) {
+    if (err.status === 400) {
+      // The page itself failed to render/be fetched.
+      res.status(502).json({
+        error:
+          err.apiStatus === "FAILED_DOCUMENT_REQUEST"
+            ? "Não foi possível acessar a página informada. Ela pode estar fora do ar, exigir login ou bloquear rastreadores."
+            : "A URL informada não pôde ser analisada. Verifique se ela está acessível publicamente."
+      });
+      return;
+    }
+    if (err.status === 403) {
+      res.status(502).json({
+        error: "Acesso negado pelo PageSpeed. Verifique a chave de API no backend."
+      });
+      return;
+    }
     if (err.status === 429) {
       res.status(429).json({
         error: "Limite de requisições excedido na API PageSpeed. Tente novamente em instantes."
+      });
+      return;
+    }
+    if (err.status >= 500) {
+      res.status(502).json({
+        error: "O serviço PageSpeed está temporariamente indisponível. Tente novamente em instantes."
       });
       return;
     }
@@ -77,7 +99,7 @@ export function errorHandler(
 
   if (err instanceof PageSpeedClientError || err instanceof TypeError) {
     res.status(502).json({
-      error: "Falha de rede ao comunicar com o serviço PageSpeed. Tente novamente."
+      error: "Falha de rede ao comunicar com o serviço PageSpeed. Verifique sua conexão e tente novamente."
     });
     return;
   }

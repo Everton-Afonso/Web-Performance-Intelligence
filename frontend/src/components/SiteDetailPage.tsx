@@ -6,7 +6,6 @@ import { LoadingState } from "./LoadingState";
 import { ErrorMessage } from "./ErrorMessage";
 import { MetricChart } from "./MetricChart";
 import { ComparisonTable } from "./ComparisonTable";
-import { FieldDataPanel } from "./FieldDataPanel";
 import { AnalysisResultView } from "./AnalysisResultView";
 
 interface SiteDetailPageProps {
@@ -144,7 +143,6 @@ export function SiteDetailPage({ siteId, onBack }: SiteDetailPageProps) {
           <h2>Detalhe da análise</h2>
         </div>
         <AnalysisResultView result={detail} />
-        <FieldDataPanel fieldData={detail.fieldData ?? null} />
       </div>
     );
   }

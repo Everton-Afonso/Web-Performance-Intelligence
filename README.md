@@ -3,12 +3,13 @@
 Plataforma de auditoria técnica de performance web. O usuário informa uma URL e
 um dispositivo; o sistema executa uma auditoria via **Google PageSpeed Insights /
 Lighthouse**, apresenta as principais métricas (**LCP, INP, CLS, FCP, TTFB**),
-classifica cada uma (Bom / Precisa melhorar / Ruim) e lista os problemas
-prioritários. Na V2 há **histórico persistido em PostgreSQL/Prisma**, dados
-reais de usuários (**CrUX**), **comparação antes/depois** e **relatório HTML**.
+classifica cada uma (Bom / Precisa melhorar / Ruim), lista os problemas
+prioritários e, a partir da V3, **explica o porquê, o que corrigir primeiro,
+como corrigir, e se a correção realmente melhorou** via um motor de diagnóstico
+baseado em evidências (regras determinísticas, sem chaves de IA externas).
 
 > Baseado na especificação consolidada `Performance_Auditor_Projeto_Completo`
-> (V1 funcional + roadmap V2/V3/V4). Este repositório implementa **V1 e V2**.
+> (V1 funcional + roadmap V2/V3/V4). Este repositório implementa **V1, V2 e V3**.
 >
 > **Princípio do produto:** não ser apenas um clone do PageSpeed Insights --
 > transformar dados técnicos em um plano de ação.
@@ -21,7 +22,7 @@ reais de usuários (**CrUX**), **comparação antes/depois** e **relatório HTML
 | ------ | --------------------------------- | ------ |
 | V1     | Auditoria funcional               | ✅ Implementado |
 | V2     | Histórico, CrUX, PostgreSQL       | ✅ Implementado |
-| V3     | IA (causa provável, recomendações)| 🔜 Evolução |
+| V3     | IA (causa provável, recomendações)| ✅ Implementado |
 | V4/Final| Produto (monitoramento, alertas) | 🔜 Evolução |
 
 A arquitetura já separa os serviços de evolução (`services/crux`, `services/ai`,
@@ -143,8 +144,8 @@ yarn dev
 ### Testes
 
 ```bash
-cd backend   && yarn test      # 99 testes unitários + integração (incl. persistência com SQLite)
-cd frontend  && yarn test      # 21 testes de componentes e fluxos
+cd backend   && yarn test      # 105 testes unitários + integração (inclui persistência SQLite e motor V3)
+cd frontend  && yarn test      # 24 testes de componentes, fluxos e painel de recomendações
 ```
 
 ### Typecheck e build
@@ -284,7 +285,8 @@ PAGESPEED_API_KEY=xxx CRUX_API_KEY=xxx docker compose -f docker/compose.yaml up 
 │   │   ├── services/
 │   │   │   ├── pagespeed/        # client.ts + parser.ts (PSI/Lighthouse)
 │   │   │   ├── performance/      # normalizer, classifier, prioritizer
-│   │   │   ├── crux/  ai/  reports/  # pastas reservadas para V2/V3/V4
+│   │   │   ├── ai/               # motor de diagnóstico (V3)
+│   │   ├── crux/ ai/  reports/  # serviços de campo, inteligência e relatórios
 │   │   │   ├── analysis.service.ts
 │   │   │   └── analysis-cache.ts
 │   │   ├── validators/           # url.validator + schemas zod
@@ -296,17 +298,17 @@ PAGESPEED_API_KEY=xxx CRUX_API_KEY=xxx docker compose -f docker/compose.yaml up 
 │   │   ├── schema.prisma         # PostgreSQL (produção)
 │   │   ├── schema.test.prisma    # SQLite (testes)
 │   │   └── migrations/
-│   └── tests/                    # 99 testes (vitest + supertest + SQLite)
+│   └── tests/                    # 105 testes (vitest + supertest + SQLite)
 ├── frontend/
 │   ├── src/
-│   │   ├── components/           # form, score, metric cards, audits, sites, histórico, gráficos
+│   │   ├── components/           # form, score, metric cards, audits, sites, histórico, gráficos, recomendações
 │   │   ├── pages/                # AnalysisPage (Nova análise)
 │   │   ├── services/             # api.ts (V1 + V2)
 │   │   ├── hooks/                # useAnalysis (estados + bloqueio de duplicados)
 │   │   ├── i18n/                 # dicionários pt-BR/en-US
 │   │   ├── types/
 │   │   └── styles/
-│   └── tests/                    # 21 testes (testing-library)
+│   └── tests/                    # 24 testes (testing-library)
 ├── docker/compose.yaml
 └── README.md
 ```
@@ -337,11 +339,19 @@ PAGESPEED_API_KEY=xxx CRUX_API_KEY=xxx docker compose -f docker/compose.yaml up 
 | Relatório HTML | `report.service.ts` + `POST /api/reports/:id` + testes |
 | Dashboard com histórico e gráficos | `SitesPage` + `SiteDetailPage` + `MetricChart` |
 
+## Entregas da V3 (cobertura)
+
+| Capacidade | Onde |
+| ---------- | ---- |
+| Motor de diagnóstico (regras baseadas em evidência) | `services/ai/diagnostic.ts` + `diagnostic.test.ts` |
+| Causa provável marcada como hipótese (não fato) | `diagnostic.ts` (campo `cause` explícito) |
+| Sugestões de código apenas com evidência suficiente | `suggestedFix` preenchido apenas para audits com dados |
+| Prioridade P0/P1/P2 e impacto esperado | `priority` + `expectedImpact` no domínio e DB |
+| Recomendações persistidas e exibidas no detalhe | `Recommendation` model + `RecommendationsPanel` |
+| Relatório com causa provável, recomendação, evidência, código e plano de ação | `report.service.ts` + `POST /api/reports/:id` |
+
 ## Roadmap proposto (próximas fases)
 
-- **V3**: camada IA interpretando métricas e audits, agrupando problemas,
-  causa provável, priorização por impacto e sugestões de código
-  (`services/ai/` já reservado; modelo `Recommendation` já no schema).
 - **V4**: projetos/sites, monitoramento agendado, regressão, alertas e metas.
 
 ---

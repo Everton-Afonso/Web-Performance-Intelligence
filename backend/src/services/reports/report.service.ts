@@ -6,7 +6,7 @@
  * export or the browser.
  */
 
-import type { AnalysisRecord, ComparisonResult, FieldData } from "../../types/storage.js";
+import type { AnalysisRecord, ComparisonResult, FieldData, Recommendation } from "../../types/storage.js";
 import type { Metric, Audit } from "../../types/analysis.js";
 
 function escapeHtml(text: string | null | undefined): string {
@@ -48,6 +48,17 @@ const CSS = `
   .regressed{color:#dc2626;font-weight:600}
   .unchanged{color:#6b7280}
   .section{margin-bottom:28px}
+  .rec{padding:14px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;margin-bottom:14px}
+  .rec__header{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:6px}
+  .rec__priority{font-weight:700;color:#fff;padding:2px 8px;border-radius:12px;font-size:.75rem}
+  .priority--p0{background:#dc2626}
+  .priority--p1{background:#d97706}
+  .priority--p2{background:#2563eb}
+  .evidence-list{margin:8px 0;color:#6b7280;font-size:.85rem}
+  .evidence-list li{margin-bottom:2px}
+  pre{background:#111827;color:#e5e7eb;padding:12px;border-radius:8px;overflow:auto;font-size:.8rem}
+  .action-plan{margin:12px 0}
+  .action-plan li{margin-bottom:8px}
   .audit-list{list-style:none;padding:0;margin:12px 0}
   .audit-list li{margin-bottom:12px;padding:10px;border:1px solid #e5e7eb;border-radius:8px;background:#fff}
   .audit-list strong{display:block;margin-bottom:2px}
@@ -98,6 +109,45 @@ function auditList(audits: Audit[]): string {
     )
     .join("");
   return `<ul class="audit-list">${items}</ul>`;
+}
+
+const PRIORITY_BADGE: Record<string, string> = {
+  P0: "priority--p0",
+  P1: "priority--p1",
+  P2: "priority--p2"
+};
+
+function recommendationBlock(r: Recommendation): string {
+  const code = r.suggestedFix
+    ? `<pre><code>${escapeHtml(r.suggestedFix)}</code></pre>`
+    : "";
+  const evidence = r.evidence.length
+    ? `<ul class="evidence-list">${r.evidence.map((e) => `<li>${escapeHtml(e)}</li>`).join("")}</ul>`
+    : "";
+  return `<article class="rec">
+    <header class="rec__header">
+      <span class="rec__priority ${PRIORITY_BADGE[r.priority] ?? ""}">${escapeHtml(r.priority)}</span>
+      <strong>${escapeHtml(r.title)}</strong>
+      <span class="muted">${escapeHtml(r.category)} · impacto ${escapeHtml(r.expectedImpact)}</span>
+    </header>
+    <p><strong>Problema:</strong> ${escapeHtml(r.description)}</p>
+    <p><strong>Causa provável:</strong> ${escapeHtml(r.cause)}</p>
+    <p><strong>Recomendação:</strong> ${escapeHtml(r.recommendedFix)}</p>
+    ${evidence}
+    ${code}
+  </article>`;
+}
+
+function recommendationSection(analysis: AnalysisRecord): string {
+  if (analysis.recommendations.length === 0) {
+    return `<section class="section"><h2>Diagnóstico e recomendações</h2><p class="muted">Nenhuma recomendação gerada (sem problemas relevantes identificados).</p></section>`;
+  }
+  const blocks = analysis.recommendations.map(recommendationBlock).join("");
+  return `<section class="section">
+    <h2>Diagnóstico e recomendações (V3 — IA)</h2>
+    <p class="muted">Causas prováveis são hipóteses baseadas nas evidências; sugestões de código são aplicáveis apenas quando há evidência suficiente.</p>
+    ${blocks}
+  </section>`;
 }
 
 function fieldDataTable(fieldData: FieldData | null): string {
@@ -235,6 +285,8 @@ export function generateReportHtml(
   ${auditList(analysis.audits)}
 </section>
 
+${recommendationSection(analysis)}
+
 ${comparison ? `<section class="section">
   <h2>Comparação antes / depois</h2>
   ${comparisonTable(comparison)}
@@ -242,8 +294,15 @@ ${comparison ? `<section class="section">
 
 <section class="section">
   <h2>Plano de ação (ordenado por prioridade)</h2>
-  <p>Audits acima já estão ordenados por severidade e impacto.</p>
-  <p><em>Recomendações detalhadas e causa provável estarão disponíveis na V3 (IA).</em></p>
+  <ol class="action-plan">
+    ${analysis.recommendations
+      .map(
+        (r) =>
+          `<li><strong>[${escapeHtml(r.priority)}]</strong> ${escapeHtml(r.title)} — ${escapeHtml(r.recommendedFix)}</li>`
+      )
+      .join("")}
+  </ol>
+  <p><em>Recomendações geradas pela camada de IA com base nas evidências; os audits acima estão ordenados por severidade e impacto.</em></p>
 </section>
 
 <div class="footer">

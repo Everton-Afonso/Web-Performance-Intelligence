@@ -6,7 +6,7 @@
  * evolve (CrUX, comparisons, AI) without breaking the API contract.
  */
 
-import type { FieldData } from "./storage.js";
+import type { FieldData, Recommendation } from "./storage.js";
 
 export type Strategy = "mobile" | "desktop";
 
@@ -86,6 +86,8 @@ export interface AnalysisResult {
   };
   /** Field (CrUX) data collected for this URL origin. V2. */
   fieldData?: FieldData | null;
+  /** Diagnostic recommendations. V3 (always computed; persisted when repository present). */
+  recommendations?: Recommendation[];
 }
 
 export interface HealthResponse {

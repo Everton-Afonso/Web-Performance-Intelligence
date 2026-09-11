@@ -120,7 +120,8 @@ function toAnalysisResult(rec: AnalysisRecord): AnalysisResult {
     warnings: [],
     siteId: rec.siteId,
     site: rec.site,
-    fieldData: rec.fieldData
+    fieldData: rec.fieldData,
+    recommendations: rec.recommendations
   };
 }
 

@@ -3,6 +3,8 @@ import { ScoreCard } from "./ScoreCard";
 import { MetricCard } from "./MetricCard";
 import { AuditList } from "./AuditList";
 import { AnalysisSummary } from "./AnalysisSummary";
+import { RecommendationsPanel } from "./RecommendationsPanel";
+import { FieldDataPanel } from "./FieldDataPanel";
 import { useI18n } from "@/i18n";
 
 const PRIORITY_METRICS: Metric["id"][] = ["performance-score", "LCP", "INP", "CLS", "FCP", "TTFB"];
@@ -42,6 +44,12 @@ export function AnalysisResultView({ result }: AnalysisResultViewProps) {
       </div>
 
       <AuditList audits={result.audits} />
+
+      {result.recommendations && result.recommendations.length > 0 && (
+        <RecommendationsPanel recommendations={result.recommendations} />
+      )}
+
+      {result.fieldData ? <FieldDataPanel fieldData={result.fieldData} /> : null}
     </div>
   );
 }

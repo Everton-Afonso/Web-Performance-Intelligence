@@ -23,6 +23,7 @@ import {
 } from "./pagespeed/parser.js";
 import { normalizeMetrics, normalizeMetric } from "./performance/normalizer.js";
 import { countAudits, prioritizeAudits } from "./performance/prioritizer.js";
+import { diagnose } from "./ai/diagnostic.js";
 import { parseUrlOrThrow } from "../validators/url.validator.js";
 
 export class PageSpeedRequestError extends Error {
@@ -84,6 +85,9 @@ export class AnalysisService {
     const audits = prioritizeAudits(parsedAudits);
     const counts = countAudits(audits);
 
+    // V3: evidence-based diagnostic recommendations
+    const recommendations = diagnose({ metrics, audits });
+
     const analyzedAt = lighthouse?.fetchTime ?? response.analysisUTCTimestamp ?? new Date().toISOString();
     const fetchTime = analyzedAt;
     const finalUrl = extractFinalUrl(lighthouse, url);
@@ -117,7 +121,8 @@ export class AnalysisService {
         fetchTime,
         fieldData,
         metrics: labMetrics,
-        audits
+        audits,
+        recommendations
       });
       resultId = created.id;
       siteId = created.siteId;
@@ -138,7 +143,8 @@ export class AnalysisService {
       warnings: extractWarnings(lighthouse),
       siteId,
       site: siteInfo,
-      fieldData: fieldData ?? undefined
+      fieldData: fieldData ?? undefined,
+      recommendations
     };
   }
 

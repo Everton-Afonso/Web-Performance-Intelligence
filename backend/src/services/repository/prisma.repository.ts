@@ -68,6 +68,39 @@ function normalizeStoredMetric(name: string, value: number | null, unit: string,
   };
 }
 
+interface StoredRecommendation {
+  targetType: string;
+  targetId: string;
+  category: string;
+  priority: string;
+  title: string;
+  description: string;
+  cause: string;
+  recommendedFix: string;
+  expectedImpact: string;
+  suggestedFix: string | null;
+  evidence: unknown;
+}
+
+function toRecommendation(r: StoredRecommendation): import("../../types/storage.js").Recommendation {
+  const array = Array.isArray(r.evidence)
+    ? (r.evidence as unknown[]).map(String)
+    : [];
+  return {
+    targetType: r.targetType as "metric" | "audit" | "group",
+    targetId: r.targetId,
+    category: r.category,
+    priority: r.priority as "P0" | "P1" | "P2",
+    title: r.title,
+    description: r.description,
+    cause: r.cause,
+    recommendedFix: r.recommendedFix,
+    expectedImpact: r.expectedImpact as "high" | "medium" | "low",
+    suggestedFix: r.suggestedFix ?? undefined,
+    evidence: array
+  };
+}
+
 function toFieldData(row: {
   url: string;
   fieldLcp: number | null;
@@ -118,6 +151,7 @@ function toAnalysisRecord(row: Record<string, unknown>): AnalysisRecord {
   const site = row.site as Record<string, unknown>;
   const metrics = (row.metrics as unknown[]) ?? [];
   const audits = (row.audits as unknown[]) ?? [];
+  const recommendations = (row.recommendations as unknown[]) ?? [];
 
   return {
     id: String(row.id),
@@ -154,9 +188,28 @@ function toAnalysisRecord(row: Record<string, unknown>): AnalysisRecord {
         impact: aa.impact as Audit["impact"]
       };
       return result;
-    })
+    }),
+    recommendations: recommendations.map((r) =>
+      toRecommendation(r as unknown as StoredRecommendation)
+    )
   };
 }
+
+const recommendationSelect = {
+  select: {
+    targetType: true,
+    targetId: true,
+    category: true,
+    priority: true,
+    title: true,
+    description: true,
+    cause: true,
+    recommendedFix: true,
+    expectedImpact: true,
+    suggestedFix: true,
+    evidence: true
+  }
+} as const;
 
 /**
  * Prisma-based repository implementing the V2 persistence contract.
@@ -220,12 +273,28 @@ export class PrismaRepository implements Repository {
             severity: a.severity,
             impact: a.impact
           }))
+        },
+        recommendations: {
+          create: (input.recommendations ?? []).map((r) => ({
+            targetType: r.targetType,
+            targetId: r.targetId,
+            category: r.category,
+            priority: r.priority,
+            title: r.title,
+            description: r.description,
+            cause: r.cause,
+            recommendedFix: r.recommendedFix,
+            expectedImpact: r.expectedImpact,
+            suggestedFix: r.suggestedFix ?? null,
+            evidence: r.evidence
+          }))
         }
       },
       include: {
         site: { select: { id: true, name: true, url: true } },
         metrics: { select: { name: true, value: true, unit: true, status: true } },
-        audits: { select: { auditId: true, title: true, description: true, score: true, numericValue: true, displayValue: true, severity: true, impact: true } }
+        audits: { select: { auditId: true, title: true, description: true, score: true, numericValue: true, displayValue: true, severity: true, impact: true } },
+        recommendations: recommendationSelect
       }
     });
     void metricById;
@@ -238,7 +307,8 @@ export class PrismaRepository implements Repository {
       include: {
         site: { select: { id: true, name: true, url: true } },
         metrics: { select: { name: true, value: true, unit: true, status: true } },
-        audits: { select: { auditId: true, title: true, description: true, score: true, numericValue: true, displayValue: true, severity: true, impact: true } }
+        audits: { select: { auditId: true, title: true, description: true, score: true, numericValue: true, displayValue: true, severity: true, impact: true } },
+        recommendations: recommendationSelect
       }
     });
     return analysis ? toAnalysisRecord(analysis) : null;

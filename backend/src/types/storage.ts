@@ -4,6 +4,25 @@
 
 import type { Audit, Metric, Strategy } from "./analysis.js";
 
+/** V3: evidence-based recommendation (never a hypothesis presented as fact). */
+export interface Recommendation {
+  targetType: "metric" | "audit" | "group";
+  targetId: string;
+  category: string;
+  priority: "P0" | "P1" | "P2";
+  title: string;
+  /** Problem statement (description). */
+  description: string;
+  /** Probable cause, clearly marked as a hypothesis. */
+  cause: string;
+  recommendedFix: string;
+  expectedImpact: "high" | "medium" | "low";
+  /** Implementation suggestion/code, only when there is enough evidence. */
+  suggestedFix?: string;
+  /** Evidence list (audits/metrics that support the assessment). */
+  evidence: string[];
+}
+
 export interface SiteRecord {
   id: string;
   name: string;
@@ -34,6 +53,7 @@ export interface AnalysisRecord {
   fieldData: FieldData | null;
   metrics: Metric[];
   audits: Audit[];
+  recommendations: Recommendation[];
 }
 
 export interface CreateAnalysisInput {
@@ -47,6 +67,7 @@ export interface CreateAnalysisInput {
   fieldData: FieldData | null;
   metrics: Metric[];
   audits: Audit[];
+  recommendations: Recommendation[];
 }
 
 export interface AnalysisSummary {
