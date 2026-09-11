@@ -15,6 +15,12 @@ export class AnalyzeController {
     const parsed = analyzeRequestSchema.parse(req.body);
     const url = parseUrlOrThrow(parsed.url);
 
+    if (parsed.strategy === "both") {
+      const result = await this.service.analyzeBoth(url);
+      res.status(200).json(result);
+      return;
+    }
+
     const cached = this.cache.get(url, parsed.strategy);
     if (cached.cached) {
       res.status(200).json(cached.value);

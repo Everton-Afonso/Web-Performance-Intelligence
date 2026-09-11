@@ -27,7 +27,7 @@ services:
       PORT: 3000
       PAGESPEED_API_KEY: ${PAGESPEED_API_KEY:-}
       PAGESPEED_API_URL: https://www.googleapis.com/pagespeedonline/v5/runPagespeed
-      PAGESPEED_TIMEOUT_MS: 60000
+      PAGESPEED_TIMEOUT_MS: 120000
       CRUX_API_KEY: ${CRUX_API_KEY:-}
       CRUX_API_URL: https://chromeuxreport.googleapis.com/v1/records:queryRecord
       CORS_ORIGIN: "*"

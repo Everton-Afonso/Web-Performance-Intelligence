@@ -10,7 +10,14 @@
  * - (V2) optionally persist the analysis (repository)
  */
 
-import type { AnalysisRequest, AnalysisResult, MetricSource, Strategy } from "../types/analysis.js";
+import type {
+  AnalysisBothResult,
+  AnalysisRequest,
+  AnalysisResult,
+  MetricSource,
+  RequestStrategy,
+  Strategy
+} from "../types/analysis.js";
 import type { FieldData, Repository } from "../types/storage.js";
 import { PageSpeedService } from "./pagespeed/client.js";
 import { CruxService } from "./crux/crux.service.js";
@@ -60,7 +67,7 @@ export class AnalysisService {
 
   async analyze(request: AnalysisRequest): Promise<AnalysisResult> {
     const url = parseUrlOrThrow(request.url);
-    const strategy = this.normalizeStrategy(request.strategy);
+    const strategy = this.normalizeStrategy(request.strategy as RequestStrategy);
 
     const response = await this.pageSpeed.run(url, strategy);
 
@@ -153,6 +160,27 @@ export class AnalysisService {
       return value;
     }
     return "mobile";
+  }
+
+  /**
+   * PSI-style combined analysis: runs mobile + desktop in parallel and returns
+   * each strategy with its own metrics/audits (never mixed).
+   */
+  async analyzeBoth(urlInput: string): Promise<AnalysisBothResult> {
+    const url = parseUrlOrThrow(urlInput);
+    const [mobile, desktop] = await Promise.all([
+      this.analyze({ url, strategy: "mobile" }),
+      this.analyze({ url, strategy: "desktop" })
+    ]);
+
+    return {
+      requestedUrl: url,
+      finalUrl: mobile.finalUrl,
+      analyzedAt: new Date().toISOString(),
+      mobile,
+      desktop,
+      site: mobile.site
+    };
   }
 
   private describeApiError(

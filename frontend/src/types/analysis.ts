@@ -3,6 +3,8 @@
  */
 
 export type Strategy = "mobile" | "desktop";
+/** Strategy selectable in the form; "both" returns mobile + desktop separately. */
+export type RequestStrategy = Strategy | "both";
 export type MetricStatus = "good" | "needs-improvement" | "poor";
 export type MetricName =
   | "LCP"
@@ -65,6 +67,16 @@ export interface AnalysisResult {
 
 export interface ApiError {
   error: string;
+}
+
+/** Combined mobile + desktop result (PSI-style), for strategy "both". */
+export interface AnalysisBothResult {
+  requestedUrl: string;
+  finalUrl: string;
+  analyzedAt: string;
+  mobile: AnalysisResult;
+  desktop: AnalysisResult;
+  site?: Pick<SiteRecord, "id" | "name" | "url">;
 }
 
 // ──────────────── V2 ────────────────

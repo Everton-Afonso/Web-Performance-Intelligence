@@ -10,6 +10,9 @@ import type { FieldData, Recommendation } from "./storage.js";
 
 export type Strategy = "mobile" | "desktop";
 
+/** Strategy accepted by the API. "both" runs mobile + desktop together (PSI-style). */
+export type RequestStrategy = Strategy | "both";
+
 export type MetricStatus = "good" | "needs-improvement" | "poor";
 
 export type MetricUnit = "ms" | "s" | "score" | "";
@@ -88,6 +91,19 @@ export interface AnalysisResult {
   fieldData?: FieldData | null;
   /** Diagnostic recommendations. V3 (always computed; persisted when repository present). */
   recommendations?: Recommendation[];
+}
+
+/**
+ * Combined mobile + desktop result (PSI-style), returned when the API is
+ * called with strategy "both". Each strategy keeps its own metrics/audits.
+ */
+export interface AnalysisBothResult {
+  requestedUrl: string;
+  finalUrl: string;
+  analyzedAt: string;
+  mobile: AnalysisResult;
+  desktop: AnalysisResult;
+  site?: { id: string; name: string; url: string };
 }
 
 export interface HealthResponse {

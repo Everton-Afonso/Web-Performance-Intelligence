@@ -1,9 +1,15 @@
 import { useI18n } from "@/i18n";
 import { AnalysisForm } from "@/components/AnalysisForm";
 import { AnalysisResultView } from "@/components/AnalysisResultView";
+import { AnalysisBothView } from "@/components/AnalysisBothView";
 import { LoadingState } from "@/components/LoadingState";
 import { ErrorMessage } from "@/components/ErrorMessage";
 import { useAnalysis } from "@/hooks/useAnalysis";
+import type { AnalysisBothResult, AnalysisResult } from "@/types/analysis";
+
+function isBoth(result: AnalysisResult | AnalysisBothResult): result is AnalysisBothResult {
+  return "mobile" in result && "desktop" in result;
+}
 
 export default function AnalysisPage() {
   const { t } = useI18n();
@@ -31,7 +37,12 @@ export default function AnalysisPage() {
 
       {state.status === "error" && <ErrorMessage message={state.message} onRetry={retry} />}
 
-      {state.status === "success" && <AnalysisResultView result={state.result} />}
+      {state.status === "success" &&
+        (isBoth(state.result) ? (
+          <AnalysisBothView result={state.result} />
+        ) : (
+          <AnalysisResultView result={state.result} />
+        ))}
     </main>
   );
 }

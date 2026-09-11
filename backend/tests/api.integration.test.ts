@@ -120,6 +120,28 @@ describe("POST /api/analyze", () => {
     expect(res.body.strategy).toBe("mobile");
   });
 
+  it("retorna mobile e desktop juntos com estratégia 'both' (PSI-style)", async () => {
+    const { app, getRequestCount } = buildServer();
+
+    const res = await request(app)
+      .post("/api/analyze")
+      .send({ url: "https://meusite.com", strategy: "both" });
+
+    expect(res.status).toBe(200);
+    expect(getRequestCount()).toBe(2); // uma chamada externa por estratégia
+    expect(res.body.mobile).toBeDefined();
+    expect(res.body.desktop).toBeDefined();
+    expect(res.body.requestedUrl).toBe("https://meusite.com");
+    expect(res.body.mobile.strategy).toBe("mobile");
+    expect(res.body.desktop.strategy).toBe("desktop");
+    expect(res.body.mobile.performanceScore).toBe(67);
+    expect(res.body.desktop.performanceScore).toBe(67);
+    expect(res.body.mobile.metrics).toBeInstanceOf(Array);
+    expect(res.body.desktop.metrics.length).toBeGreaterThan(0);
+    // cada estratégia mantém sua própria lista (sem misturar)
+    expect(res.body.mobile.finalUrl).toBe(res.body.desktop.finalUrl);
+  });
+
   it("usa cache para evitar análises duplicadas (RNF-14)", async () => {
     const { app, getRequestCount } = buildServer();
     const first = await request(app)

@@ -1138,3 +1138,42 @@ button {
   font-size: 0.8rem;
   line-height: 1.5;
 }
+
+/* ---------- Dual (mobile + desktop) ---------- */
+
+.dual {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .dual {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dual__heading {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+}
+
+.dual__heading--mobile {
+  color: var(--accent);
+  border-left: 4px solid var(--accent);
+}
+
+.dual__heading--desktop {
+  color: var(--accent);
+  border-left: 4px solid var(--warn);
+}

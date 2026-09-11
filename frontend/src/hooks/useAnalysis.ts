@@ -1,18 +1,18 @@
 import { useRef, useState } from "react";
-import type { AnalysisResult, Strategy } from "@/types/analysis";
+import type { AnalysisBothResult, AnalysisResult, RequestStrategy } from "@/types/analysis";
 import { analyzeUrl, ApiRequestError } from "@/services/api";
 
 export type AnalysisState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "success"; result: AnalysisResult }
+  | { status: "success"; result: AnalysisResult | AnalysisBothResult }
   | { status: "error"; message: string };
 
-const DEFAULT_STRATEGY: Strategy = "mobile";
+const DEFAULT_STRATEGY: RequestStrategy = "mobile";
 
 export interface AnalyzeOptions {
   url: string;
-  strategy: Strategy;
+  strategy: RequestStrategy;
 }
 
 /**
@@ -21,7 +21,7 @@ export interface AnalyzeOptions {
  */
 export function useAnalysis() {
   const [state, setState] = useState<AnalysisState>({ status: "idle" });
-  const [strategy, setStrategy] = useState<Strategy>(DEFAULT_STRATEGY);
+  const [strategy, setStrategy] = useState<RequestStrategy>(DEFAULT_STRATEGY);
   const [url, setUrl] = useState("");
   const inFlight = useRef(false);
   const lastRequest = useRef<AnalyzeOptions | null>(null);

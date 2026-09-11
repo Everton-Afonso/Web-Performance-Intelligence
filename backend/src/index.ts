@@ -13,7 +13,7 @@ function readConfig() {
   const port = Number(process.env.PORT ?? 3000);
   const apiUrl = process.env.PAGESPEED_API_URL ?? "https://www.googleapis.com/pagespeedonline/v5/runPagespeed";
   const apiKey = process.env.PAGESPEED_API_KEY ?? "";
-  const timeoutMs = Number(process.env.PAGESPEED_TIMEOUT_MS ?? 60000);
+  const timeoutMs = Number(process.env.PAGESPEED_TIMEOUT_MS ?? 120000);
   const corsOrigin = process.env.CORS_ORIGIN ?? "*";
   const databaseUrl = process.env.DATABASE_URL ?? "";
   const cruxApiUrl = process.env.CRUX_API_URL ?? "https://chromeuxreport.googleapis.com/v1/records:queryRecord";

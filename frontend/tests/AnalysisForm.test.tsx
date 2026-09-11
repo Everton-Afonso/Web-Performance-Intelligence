@@ -3,13 +3,18 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AnalysisForm } from "../src/components/AnalysisForm";
 
+const mobileRadio = () => screen.getByRole("radio", { name: /^mobile$/i });
+const desktopRadio = () => screen.getByRole("radio", { name: /^desktop$/i });
+const bothRadio = () => screen.getByRole("radio", { name: "Mobile + Desktop" });
+
 describe("AnalysisForm", () => {
   it("renderiza os campos de URL e estratégia", () => {
     render(<AnalysisForm busy={false} onSubmit={vi.fn()} />);
 
     expect(screen.getByLabelText(/URL do site/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/mobile/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/desktop/i)).toBeInTheDocument();
+    expect(mobileRadio()).toBeInTheDocument();
+    expect(desktopRadio()).toBeInTheDocument();
+    expect(bothRadio()).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /analisar/i })).toBeInTheDocument();
   });
 
@@ -41,8 +46,8 @@ describe("AnalysisForm", () => {
     render(<AnalysisForm busy={true} onSubmit={vi.fn()} />);
 
     expect(screen.getByLabelText(/URL do site/i)).toBeDisabled();
-    expect(screen.getByLabelText(/mobile/i)).toBeDisabled();
-    expect(screen.getByLabelText(/desktop/i)).toBeDisabled();
+    expect(mobileRadio()).toBeDisabled();
+    expect(desktopRadio()).toBeDisabled();
     expect(screen.getByRole("button", { name: /analisando/i })).toBeDisabled();
   });
 
@@ -51,10 +56,22 @@ describe("AnalysisForm", () => {
     const user = userEvent.setup();
     render(<AnalysisForm busy={false} onSubmit={onSubmit} />);
 
-    await user.click(screen.getByLabelText(/desktop/i));
+    await user.click(desktopRadio());
     await user.type(screen.getByLabelText(/URL do site/i), "https://site.com");
     await user.click(screen.getByRole("button", { name: /analisar/i }));
 
     expect(onSubmit).toHaveBeenCalledWith("https://site.com", "desktop");
+  });
+
+  it("permite selecionar Mobile + Desktop (both)", async () => {
+    const onSubmit = vi.fn();
+    const user = userEvent.setup();
+    render(<AnalysisForm busy={false} onSubmit={onSubmit} />);
+
+    await user.click(bothRadio());
+    await user.type(screen.getByLabelText(/URL do site/i), "https://site.com");
+    await user.click(screen.getByRole("button", { name: /analisar/i }));
+
+    expect(onSubmit).toHaveBeenCalledWith("https://site.com", "both");
   });
 });

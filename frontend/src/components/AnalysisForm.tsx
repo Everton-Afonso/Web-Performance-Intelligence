@@ -1,13 +1,13 @@
 import { useMemo, useState, type FormEvent } from "react";
-import type { Strategy } from "@/types/analysis";
+import type { RequestStrategy } from "@/types/analysis";
 import { useI18n } from "@/i18n";
 
 export interface AnalysisFormProps {
   /** Mirrors RF-12: true while an analysis is running */
   busy: boolean;
   initialUrl?: string;
-  initialStrategy?: Strategy;
-  onSubmit: (url: string, strategy: Strategy) => void;
+  initialStrategy?: RequestStrategy;
+  onSubmit: (url: string, strategy: RequestStrategy) => void;
 }
 
 const URL_PATTERN = /^https?:\/\/[^\s/$.?#].[^\s]*$/i;
@@ -31,7 +31,7 @@ export function AnalysisForm({
 }: AnalysisFormProps) {
   const { t } = useI18n();
   const [url, setUrl] = useState(initialUrl);
-  const [strategy, setStrategy] = useState<Strategy>(initialStrategy);
+  const [strategy, setStrategy] = useState<RequestStrategy>(initialStrategy);
   const [errorKey, setErrorKey] = useState<string | null>(null);
 
   const canSubmit = useMemo(() => !busy, [busy]);
@@ -100,6 +100,17 @@ export function AnalysisForm({
               onChange={() => setStrategy("desktop")}
             />
             <span>{t("form.strategy.desktop")}</span>
+          </label>
+          <label className="analysis-form__option">
+            <input
+              type="radio"
+              name="strategy"
+              value="both"
+              checked={strategy === "both"}
+              disabled={busy}
+              onChange={() => setStrategy("both")}
+            />
+            <span>{t("form.strategy.both")}</span>
           </label>
         </div>
       </fieldset>

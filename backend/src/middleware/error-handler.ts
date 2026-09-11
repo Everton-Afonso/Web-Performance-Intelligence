@@ -63,6 +63,17 @@ export function errorHandler(
   }
 
   if (err instanceof PageSpeedHttpError) {
+    const rateLimited =
+      err.status === 429 ||
+      (err.apiStatus ?? "").includes("RATE_LIMIT") ||
+      (err.apiStatus ?? "").includes("QUOTA") ||
+      /quota|limit/i.test(err.apiMessage ?? "");
+    if (rateLimited) {
+      res.status(429).json({
+        error: "Limite de requisições excedido na API PageSpeed. Aguarde um instante e tente novamente."
+      });
+      return;
+    }
     if (err.status === 400) {
       // The page itself failed to render/be fetched.
       res.status(502).json({

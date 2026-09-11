@@ -1,5 +1,6 @@
 import type {
   AlertRecord,
+  AnalysisBothResult,
   AnalysisRecord,
   AnalysisResult,
   AnalysisSummary,
@@ -8,6 +9,7 @@ import type {
   GoalOperator,
   MonitorRecord,
   ProjectRecord,
+  RequestStrategy,
   SiteRecord,
   Strategy
 } from "@/types/analysis";
@@ -72,8 +74,8 @@ async function fetchJson<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 // ──────────────── V1 core ────────────────
 
-export function analyzeUrl(url: string, strategy: Strategy): Promise<AnalysisResult> {
-  return fetchJson<AnalysisResult>("/analyze", {
+export function analyzeUrl(url: string, strategy: RequestStrategy): Promise<AnalysisResult | AnalysisBothResult> {
+  return fetchJson<AnalysisResult | AnalysisBothResult>("/analyze", {
     method: "POST",
     body: JSON.stringify({ url, strategy })
   });
