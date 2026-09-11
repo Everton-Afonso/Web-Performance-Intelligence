@@ -31,6 +31,9 @@ import {
 import { normalizeMetrics, normalizeMetric } from "./performance/normalizer.js";
 import { countAudits, prioritizeAudits } from "./performance/prioritizer.js";
 import { diagnose } from "./ai/diagnostic.js";
+import { shouldSuggestWebPageTest } from "./webpagetest/severity.js";
+import type { WebPageTestService } from "./webpagetest/client.js";
+import type { WebPageTestSummary } from "../types/webpagetest.js";
 import { parseUrlOrThrow } from "../validators/url.validator.js";
 
 export class PageSpeedRequestError extends Error {
@@ -48,18 +51,21 @@ export interface AnalysisDeps {
   pageSpeed: PageSpeedService;
   repository?: Repository;
   crux?: CruxService;
+  webPageTest?: WebPageTestService;
 }
 
 export class AnalysisService {
   private readonly pageSpeed: PageSpeedService;
   private readonly repository?: Repository;
   private readonly crux?: CruxService;
+  private readonly webPageTest?: WebPageTestService;
 
   constructor(deps: PageSpeedService | AnalysisDeps) {
     if ("pageSpeed" in deps) {
       this.pageSpeed = deps.pageSpeed;
       this.repository = deps.repository;
       this.crux = deps.crux;
+      this.webPageTest = deps.webPageTest;
     } else {
       this.pageSpeed = deps;
     }
@@ -95,6 +101,13 @@ export class AnalysisService {
     // V3: evidence-based diagnostic recommendations
     const recommendations = diagnose({ metrics, audits });
 
+    // Sources: lab metrics/audits from Lighthouse
+    for (const m of metrics) m.source = "lab";
+    for (const a of audits) a.source = "lab";
+
+    // V1.1: severity rules suggest the deep WebPageTest investigation (RF-23)
+    const needsWebPageTest = shouldSuggestWebPageTest({ metrics, audits });
+
     const analyzedAt = lighthouse?.fetchTime ?? response.analysisUTCTimestamp ?? new Date().toISOString();
     const fetchTime = analyzedAt;
     const finalUrl = extractFinalUrl(lighthouse, url);
@@ -107,6 +120,7 @@ export class AnalysisService {
     let resultId = response.id ?? `${url}::${strategy}`;
     let siteId: string | undefined;
     let siteInfo: { id: string; name: string; url: string } | undefined;
+    const warnings = extractWarnings(lighthouse);
 
     // V2: persist when repository is configured
     if (this.repository) {
@@ -136,6 +150,27 @@ export class AnalysisService {
       siteInfo = { id: created.site.id, name: created.site.name, url: created.site.url };
     }
 
+    // V1.1: on-demand deep WebPageTest investigation (RF-20/22/23/26)
+    let webPageTestSummary: WebPageTestSummary | null = null;
+    if (request.deep && this.webPageTest && this.repository) {
+      try {
+        const dispatch = await this.webPageTest.dispatch(url, strategy);
+        await this.repository.attachWebPageTestDispatch(resultId, dispatch.testId, "pending");
+        webPageTestSummary = {
+          testId: dispatch.testId,
+          status: "pending",
+          metrics: [],
+          requests: 0,
+          bytes: 0,
+          topRequests: [],
+          analyzedAt: new Date().toISOString()
+        };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        warnings.push(`WebPageTest indisponível: ${msg}`);
+      }
+    }
+
     return {
       id: resultId,
       requestedUrl: url,
@@ -147,11 +182,13 @@ export class AnalysisService {
       audits,
       failedAuditsCount: counts.total,
       highImpactCount: counts.highImpact,
-      warnings: extractWarnings(lighthouse),
+      warnings,
       siteId,
       site: siteInfo,
       fieldData: fieldData ?? undefined,
-      recommendations
+      recommendations,
+      needsWebPageTest,
+      webPageTest: webPageTestSummary
     };
   }
 

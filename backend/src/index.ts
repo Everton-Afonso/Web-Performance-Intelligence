@@ -7,6 +7,7 @@ import { AnalysisService } from "./services/analysis.service.js";
 import { AnalysisCache } from "./services/analysis-cache.js";
 import { PrismaRepository } from "./services/repository/prisma.repository.js";
 import { MonitoringScheduler } from "./services/monitoring/scheduler.js";
+import { WebPageTestService } from "./services/webpagetest/client.js";
 import type { AnalysisResult } from "./types/analysis.js";
 
 function readConfig() {
@@ -18,8 +19,21 @@ function readConfig() {
   const databaseUrl = process.env.DATABASE_URL ?? "";
   const cruxApiUrl = process.env.CRUX_API_URL ?? "https://chromeuxreport.googleapis.com/v1/records:queryRecord";
   const cruxApiKey = process.env.CRUX_API_KEY ?? apiKey;
+  const webPageTestApiKey = process.env.WEBPAGETEST_API_KEY ?? "";
+  const webPageTestApiUrl = process.env.WEBPAGETEST_API_URL ?? "https://www.webpagetest.org";
 
-  return { port, apiUrl, apiKey, timeoutMs, corsOrigin, databaseUrl, cruxApiUrl, cruxApiKey };
+  return {
+    port,
+    apiUrl,
+    apiKey,
+    timeoutMs,
+    corsOrigin,
+    databaseUrl,
+    cruxApiUrl,
+    cruxApiKey,
+    webPageTestApiKey,
+    webPageTestApiUrl
+  };
 }
 
 function bootstrap() {
@@ -41,10 +55,18 @@ function bootstrap() {
     ? new CruxService({ apiUrl: config.cruxApiUrl, apiKey: config.cruxApiKey })
     : undefined;
 
+  const webPageTest = config.webPageTestApiKey
+    ? new WebPageTestService({
+        apiKey: config.webPageTestApiKey,
+        apiUrl: config.webPageTestApiUrl
+      })
+    : undefined;
+
   const service = new AnalysisService({
     pageSpeed,
     repository,
-    crux
+    crux,
+    webPageTest
   });
 
   const cache = new AnalysisCache<AnalysisResult>({ ttlMs: 5 * 60 * 1000 });
@@ -63,7 +85,8 @@ function bootstrap() {
     cache,
     corsOrigin: config.corsOrigin,
     repository,
-    scheduler
+    scheduler,
+    webPageTest
   });
 
   return {
@@ -72,6 +95,7 @@ function bootstrap() {
       console.log(`[wpintel] persistence: ${repository ? "enabled (PostgreSQL)" : "disabled (in-memory cache only)"}`);
       console.log(`[wpintel] CrUX field data: ${crux ? "enabled" : "disabled"}`);
       console.log(`[wpintel] monitoring scheduler: ${scheduler ? "enabled" : "disabled"}`);
+      console.log(`[wpintel] WebPageTest (deep): ${webPageTest ? "enabled" : "disabled (sem WEBPAGETEST_API_KEY)"}`);
     }),
     shutdown: async () => {
       scheduler?.stop();

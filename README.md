@@ -24,6 +24,7 @@ baseado em evidências (regras determinísticas, sem chaves de IA externas).
 | V2     | Histórico, CrUX, PostgreSQL       | ✅ Implementado |
 | V3     | IA (causa provável, recomendações)| ✅ Implementado |
 | V4     | Produto (monitoramento, alertas)  | ✅ Implementado |
+| v1.1   | WebPageTest (análise avançada)    | ✅ Implementado |
 
 A arquitetura já separa os serviços de evolução (`services/crux`, `services/ai`,
 `services/reports`) para acomodar as próximas fases sem refatoração estrutural.
@@ -361,6 +362,31 @@ PAGESPEED_API_KEY=xxx CRUX_API_KEY=xxx docker compose -f docker/compose.yaml up 
 | Alertas | `Alert` model + `GET/POST /api/alerts` + contador de não lidos |
 | Metas por site | `Goal` model + `GET/POST /api/sites/:id/goals` + avaliação na execução |
 | Relatório recorrente | análises automáticas alimentam relatórios antes/depois on-demand |
+
+## WebPageTest (v1.1 — investigação avançada)
+
+**Papel:** terceira fonte de performance. O PageSpeed/Lighthouse faz o lab, o CrUX o campo, e o
+WebPageTest fornece **waterfall, requests, bytes e métricas do teste** para localizar gargalos.
+
+**Requisitos novos (RF-20..26):**
+- `POST /api/analyses/:id/webpagetest` — dispatch sob demanda (RF-23)
+- `GET /api/analyses/:id/webpagetest` — polling do resultado e persistência (RF-21/22)
+- `POST /api/analyze` com `"deep": true` — dispara o teste junto (quando há chave)
+- `needsWebPageTest` — regras de severidade (LCP/TTFB/CLS fora do limite ou audits de alto
+  impacto) indicam quando a investigação é recomendada
+- A análise `webPageTest` (status/testId/árvore/metrics) é persistida; `source` em métricas é
+  `lab`/`field`/`wpt` para diferenciar as fontes no histórico/relatório
+- Relatório HTML ganha a seção **WebPageTest** (métricas do teste + requests mais lentos)
+
+**Aviso de acesso/custo (documento v1.1):** a API do WebPageTest é um recurso do **plano Pro**
+(o Starter é gratuito apenas para testes no site). A integração está encapsulada, controla quota
+e **só fica ativa com chave válida** (RF-26). Sem chave, os endpoints respondem `503` com mensagem clara.
+
+| Variável | Descrição |
+| -------- | --------- |
+| `WEBPAGETEST_API_KEY` | Chave da API do WebPageTest (plano Pro) |
+| `WEBPAGETEST_API_URL` | Base `https://www.webpagetest.org` |
+| `WEBPAGETEST_TIMEOUT_MS` | Timeout de espera do teste (padrão 180000) |
 
 ## Roadmap proposto (plataforma final)
 

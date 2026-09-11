@@ -6,6 +6,7 @@ export type Strategy = "mobile" | "desktop";
 /** Strategy selectable in the form; "both" returns mobile + desktop separately. */
 export type RequestStrategy = Strategy | "both";
 export type MetricStatus = "good" | "needs-improvement" | "poor";
+export type MetricSourceLabel = "lab" | "field" | "wpt";
 export type MetricName =
   | "LCP"
   | "INP"
@@ -24,6 +25,7 @@ export interface Metric {
   status: MetricStatus | null;
   displayValue: string;
   description?: string;
+  source?: MetricSourceLabel;
 }
 
 export type AuditSeverity = "P0" | "P1" | "P2";
@@ -63,6 +65,8 @@ export interface AnalysisResult {
   site?: Pick<SiteRecord, "id" | "name" | "url">;
   fieldData?: FieldData | null;
   recommendations?: Recommendation[];
+  needsWebPageTest?: boolean;
+  webPageTest?: WebPageTestSummary | null;
 }
 
 export interface ApiError {
@@ -167,6 +171,7 @@ export interface AnalysisRecord {
   metrics: Metric[];
   audits: Audit[];
   recommendations: Recommendation[];
+  webPageTest?: WebPageTestSummary | null;
 }
 
 export interface MetricComparison {
@@ -177,6 +182,31 @@ export interface MetricComparison {
   delta: number | null;
   pctChange: number | null;
   direction: "improved" | "regressed" | "unchanged" | "unknown";
+}
+
+export type WptStatus = "pending" | "completed" | "error" | "timeout";
+
+export interface WebPageTestRequestEvidence {
+  url: string;
+  host: string;
+  contentType: string;
+  startTime: number;
+  loadTime: number;
+  bytes: number;
+  isThirdParty: boolean;
+}
+
+export interface WebPageTestSummary {
+  testId: string;
+  status: WptStatus;
+  metrics: Metric[];
+  requests: number;
+  bytes: number;
+  topRequests: WebPageTestRequestEvidence[];
+  waterfallRef?: string;
+  analyzedAt: string;
+  location?: string;
+  browser?: string;
 }
 
 /** V3: evidence-based recommendation. */

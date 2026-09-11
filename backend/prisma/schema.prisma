@@ -90,10 +90,14 @@ model Analysis {
   fieldCls    Float?
   fieldFcp    Float?
   fieldTtfb   Float?
+  webPageTestStatus String?
+  webPageTestTestId String?
+  webPageTestAnalyzedAt DateTime?
   site        Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
   metrics     Metric[]
   audits      Audit[]
   recommendations Recommendation[]
+  webPageTestResults WebPageTestResult[]
   baselineOf  Comparison[] @relation("BaselineComparison")
   currentOf   Comparison[] @relation("CurrentComparison")
 
@@ -101,9 +105,27 @@ model Analysis {
   @@index([url, strategy, analyzedAt])
 }
 
+model WebPageTestResult {
+  id            String   @id @default(uuid())
+  analysisId    String
+  testId        String
+  status        String
+  metrics       Json
+  topRequests   Json
+  requests      Int
+  bytes         Float
+  waterfallRef  String?
+  analyzedAt    DateTime @default(now())
+  analysis      Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@unique([analysisId])
+  @@index([analysisId])
+}
+
 model Metric {
   id         String  @id @default(uuid())
   analysisId String
+  source     String  @default("lab")
   name       String
   value      Float?
   unit       String
@@ -117,6 +139,7 @@ model Metric {
 model Audit {
   id          String  @id @default(uuid())
   analysisId  String
+  source      String  @default("lab")
   auditId     String
   title       String
   description String

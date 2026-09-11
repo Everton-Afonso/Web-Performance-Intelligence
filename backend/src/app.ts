@@ -12,7 +12,9 @@ import { createSitesRouter } from "./routes/sites.routes.js";
 import { createCompareRouter } from "./routes/compare.routes.js";
 import { createReportRouter } from "./routes/report.routes.js";
 import { createV4Router } from "./routes/v4.routes.js";
+import { createWebPageTestRouter } from "./routes/webpagetest.routes.js";
 import type { MonitoringScheduler } from "./services/monitoring/scheduler.js";
+import type { WebPageTestService } from "./services/webpagetest/client.js";
 
 export interface AppDependencies {
   service: AnalysisService;
@@ -24,6 +26,8 @@ export interface AppDependencies {
   repository?: Repository;
   /** V4 monitoring scheduler (enables POST /api/monitoring/:id/run). */
   scheduler?: MonitoringScheduler;
+  /** WebPageTest advanced investigation (V1.1). */
+  webPageTest?: WebPageTestService;
 }
 
 export function createApp(deps: AppDependencies): Express {
@@ -44,6 +48,7 @@ export function createApp(deps: AppDependencies): Express {
     app.use("/api", createCompareRouter(deps.repository));
     app.use("/api", createReportRouter(deps.repository));
     app.use("/api", createV4Router(deps.repository, deps.scheduler));
+    app.use("/api", createWebPageTestRouter(deps.repository, deps.webPageTest));
   }
 
   app.use(notFoundHandler);

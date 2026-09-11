@@ -128,7 +128,9 @@ function toAnalysisResult(rec: AnalysisRecord): AnalysisResult {
     siteId: rec.siteId,
     site: rec.site,
     fieldData: rec.fieldData,
-    recommendations: rec.recommendations
+    recommendations: rec.recommendations,
+    needsWebPageTest: false,
+    webPageTest: rec.webPageTest ?? null
   };
 }
 
@@ -225,6 +227,16 @@ export function upsertGoal(siteId: string, metric: string, target: number, opera
 
 export function deleteGoal(siteId: string, goalId: string): Promise<void> {
   return fetchJson(`/sites/${siteId}/goals/${goalId}`, { method: "DELETE" });
+}
+
+// ──────────────── WebPageTest (V1.1) ────────────────
+
+export function runWebPageTest(analysisId: string): Promise<{ webPageTest: import("@/types/analysis").WebPageTestSummary }> {
+  return fetchJson(`/analyses/${analysisId}/webpagetest`, { method: "POST" });
+}
+
+export function getWebPageTest(analysisId: string): Promise<{ webPageTest: import("@/types/analysis").WebPageTestSummary }> {
+  return fetchJson(`/analyses/${analysisId}/webpagetest`);
 }
 
 export { API_BASE };

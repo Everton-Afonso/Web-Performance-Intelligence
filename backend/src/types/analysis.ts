@@ -7,6 +7,7 @@
  */
 
 import type { FieldData, Recommendation } from "./storage.js";
+import type { WebPageTestSummary } from "./webpagetest.js";
 
 export type Strategy = "mobile" | "desktop";
 
@@ -27,6 +28,9 @@ export type MetricName =
   | "SI"
   | "performance-score";
 
+/** Source of a metric/audit: lab (Lighthouse), field (CrUX) or wpt (WebPageTest). */
+export type MetricSourceLabel = "lab" | "field" | "wpt";
+
 export interface Metric {
   id: MetricName;
   name: string;
@@ -36,6 +40,7 @@ export interface Metric {
   /** human readable value with unit, e.g. "1.2 s" or "0.31" */
   displayValue: string;
   description?: string;
+  source?: MetricSourceLabel;
 }
 
 /** Input describing a metric before normalization (raw extraction). */
@@ -61,11 +66,14 @@ export interface Audit {
   metric?: MetricName;
   severity: AuditSeverity;
   impact: "high" | "medium" | "low";
+  source?: MetricSourceLabel;
 }
 
 export interface AnalysisRequest {
   url: string;
   strategy: Strategy;
+  /** When true and WebPageTest is enabled, dispatches the deep investigation. */
+  deep?: boolean;
 }
 
 export interface AnalysisResult {
@@ -91,6 +99,10 @@ export interface AnalysisResult {
   fieldData?: FieldData | null;
   /** Diagnostic recommendations. V3 (always computed; persisted when repository present). */
   recommendations?: Recommendation[];
+  /** Severity rules suggest running the deep WebPageTest investigation (RF-23). */
+  needsWebPageTest?: boolean;
+  /** WebPageTest advanced investigation, when requested/available (RF-20..25). */
+  webPageTest?: WebPageTestSummary | null;
 }
 
 /**

@@ -117,6 +117,54 @@ const PRIORITY_BADGE: Record<string, string> = {
   P2: "priority--p2"
 };
 
+function webPageTestSection(analysis: AnalysisRecord): string {
+  const wpt = analysis.webPageTest;
+  if (!wpt) {
+    return `<section class="section"><h2>WebPageTest (investigação avançada)</h2><p class="muted">Não executado / não disponível.</p></section>`;
+  }
+  if (wpt.status !== "completed") {
+    return `<section class="section">
+      <h2>WebPageTest (investigação avançada)</h2>
+      <p><strong>Status:</strong> ${escapeHtml(wpt.status)} · <strong>testId:</strong> ${escapeHtml(wpt.testId)}</p>
+      <p class="muted">Execute POST /api/analyses/:id/webpagetest e consulte o resultado para concluir.</p>
+    </section>`;
+  }
+
+  const metricRows = wpt.metrics
+    .map(
+      (m) => `<tr>
+        <td>${escapeHtml(m.name)}</td>
+        <td>${escapeHtml(m.displayValue)}</td>
+        <td>${statusHtml(m.status)}</td>
+      </tr>`
+    )
+    .join("");
+
+  const requestRows = wpt.topRequests
+    .map(
+      (r) => `<tr>
+        <td title="${escapeHtml(r.url)}">${escapeHtml(r.url.replace(/^https?:\/\//, ""))}</td>
+        <td>${r.host}</td>
+        <td>${escapeHtml(r.contentType)}</td>
+        <td>${r.loadTime.toFixed(0)} ms</td>
+        <td>${(r.bytes / 1024).toFixed(1)} kB</td>
+        <td>${r.isThirdParty ? "sim" : "não"}</td>
+      </tr>`
+    )
+    .join("");
+
+  return `<section class="section">
+    <h2>WebPageTest (investigação avançada)</h2>
+    <p><strong>testId:</strong> ${escapeHtml(wpt.testId)} · <strong>waterfall:</strong>
+      <a href="${escapeHtml(wpt.waterfallRef ?? "")}">abrir resultado</a></p>
+    <p><strong>Request count:</strong> ${wpt.requests} · <strong>Bytes:</strong> ${(wpt.bytes / 1024).toFixed(1)} kB</p>
+    <h3>Métricas do teste</h3>
+    <table><thead><tr><th>Métrica</th><th>Valor</th><th>Status</th></tr></thead><tbody>${metricRows || '<tr><td colspan="3" class="muted">sem métricas disponíveis</td></tr>'}</tbody></table>
+    <h3>Requests mais lentos (evidência de waterfall)</h3>
+    <table><thead><tr><th>Recurso</th><th>Host</th><th>Tipo</th><th>Load</th><th>Bytes</th><th>3rd party</th></tr></thead><tbody>${requestRows || '<tr><td colspan="6" class="muted">sem dados de request</td></tr>'}</tbody></table>
+  </section>`;
+}
+
 function recommendationBlock(r: Recommendation): string {
   const code = r.suggestedFix
     ? `<pre><code>${escapeHtml(r.suggestedFix)}</code></pre>`
@@ -274,6 +322,8 @@ export function generateReportHtml(
   <h2>Dados de campo (CrUX)</h2>
   ${fieldDataTable(analysis.fieldData)}
 </section>
+
+${webPageTestSection(analysis)}
 
 <section class="section">
   <h2>Lab ↔ Field</h2>

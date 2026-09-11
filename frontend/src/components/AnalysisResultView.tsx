@@ -5,6 +5,7 @@ import { AuditList } from "./AuditList";
 import { AnalysisSummary } from "./AnalysisSummary";
 import { RecommendationsPanel } from "./RecommendationsPanel";
 import { FieldDataPanel } from "./FieldDataPanel";
+import { WebPageTestPanel } from "./WebPageTestPanel";
 import { useI18n } from "@/i18n";
 
 const PRIORITY_METRICS: Metric["id"][] = ["performance-score", "LCP", "INP", "CLS", "FCP", "TTFB"];
@@ -48,6 +49,12 @@ export function AnalysisResultView({ result }: AnalysisResultViewProps) {
       {result.recommendations && result.recommendations.length > 0 && (
         <RecommendationsPanel recommendations={result.recommendations} />
       )}
+
+      <WebPageTestPanel
+        analysisId={result.id}
+        summary={result.webPageTest ?? null}
+        suggested={Boolean(result.needsWebPageTest)}
+      />
 
       {result.fieldData ? <FieldDataPanel fieldData={result.fieldData} /> : null}
     </div>

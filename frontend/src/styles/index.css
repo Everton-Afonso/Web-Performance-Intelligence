@@ -1177,3 +1177,46 @@ button {
   color: var(--accent);
   border-left: 4px solid var(--warn);
 }
+
+/* ---------- WebPageTest ---------- */
+
+.wpt {
+  padding: 20px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.wpt__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.wpt__suggested {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--warn);
+  border: 1px solid var(--warn);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+
+.wpt__body {
+  margin-top: 10px;
+}
+
+.wpt__meta {
+  margin: 0 0 6px;
+  font-size: 0.85rem;
+}
+
+.wpt__counts {
+  margin: 0 0 12px;
+}
+
+.metric-card--wpt {
+  border-left-color: var(--accent);
+}

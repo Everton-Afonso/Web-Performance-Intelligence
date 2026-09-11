@@ -146,7 +146,23 @@ const messages: Record<Locale, Record<string, string>> = {
     "goals.operator.lte": "≤",
     "goals.operator.gte": "≥",
     "goals.form.submit": "Adicionar meta",
-    "goals.delete": "Excluir"
+    "goals.delete": "Excluir",
+    "wpt.title": "WebPageTest (investigação avançada)",
+    "wpt.suggested": "sugerido",
+    "wpt.notRun": "Não executado. O WebPageTest analisa waterfall, requests e recursos para localizar o gargalo técnico.",
+    "wpt.run": "Executar análise avançada",
+    "wpt.pendingHint": "Aguardando o teste do WebPageTest. Clique para buscar o resultado.",
+    "wpt.poll": "Verificar resultado",
+    "wpt.waterfall": "Abrir waterfall",
+    "wpt.counts": "requests · bytes",
+    "wpt.requestsCount": "requests",
+    "wpt.bytesCount": "transferidas",
+    "wpt.topRequests": "Requests mais lentos (evidência)",
+    "wpt.req.resource": "Recurso",
+    "wpt.req.host": "Host",
+    "wpt.req.type": "Tipo",
+    "wpt.req.load": "Load",
+    "wpt.req.bytes": "Bytes"
   },
   "en-US": {
     "app.title": "Web Performance Intelligence",
@@ -285,7 +301,23 @@ const messages: Record<Locale, Record<string, string>> = {
     "goals.operator.lte": "≤",
     "goals.operator.gte": "≥",
     "goals.form.submit": "Add goal",
-    "goals.delete": "Delete"
+    "goals.delete": "Delete",
+    "wpt.title": "WebPageTest (deep investigation)",
+    "wpt.suggested": "suggested",
+    "wpt.notRun": "Not run. WebPageTest analyzes waterfall, requests and resources to pinpoint the technical bottleneck.",
+    "wpt.run": "Run deep analysis",
+    "wpt.pendingHint": "Waiting for the WebPageTest run. Click to fetch the result.",
+    "wpt.poll": "Fetch result",
+    "wpt.waterfall": "Open waterfall",
+    "wpt.counts": "requests · bytes",
+    "wpt.requestsCount": "requests",
+    "wpt.bytesCount": "transferred",
+    "wpt.topRequests": "Slowest requests (evidence)",
+    "wpt.req.resource": "Resource",
+    "wpt.req.host": "Host",
+    "wpt.req.type": "Type",
+    "wpt.req.load": "Load",
+    "wpt.req.bytes": "Bytes"
   }
 };
 

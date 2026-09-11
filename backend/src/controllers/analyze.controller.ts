@@ -22,13 +22,15 @@ export class AnalyzeController {
     }
 
     const cached = this.cache.get(url, parsed.strategy);
-    if (cached.cached) {
+    if (cached.cached && !parsed.deep) {
       res.status(200).json(cached.value);
       return;
     }
 
-    const result = await this.service.analyze({ url, strategy: parsed.strategy });
-    this.cache.set(url, parsed.strategy, result);
+    const result = await this.service.analyze({ url, strategy: parsed.strategy, deep: parsed.deep });
+    if (!parsed.deep) {
+      this.cache.set(url, parsed.strategy, result);
+    }
     res.status(200).json(result);
   }
 }

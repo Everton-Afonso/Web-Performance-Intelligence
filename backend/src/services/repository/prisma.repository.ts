@@ -35,6 +35,11 @@ interface AnalysisDb {
     create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
     findUnique(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
     findMany(args?: Record<string, unknown>): Promise<Array<Record<string, unknown>>>;
+    update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+  };
+  webPageTestResult: {
+    upsert(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+    findUnique(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
   };
   comparison: {
     create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
@@ -85,7 +90,7 @@ const NORMALIZED_BY_ID: Record<MetricName, { unit: MetricUnit; display: (v: numb
   "performance-score": { unit: "score", display: (v, u) => formatValue(v, u, "performance-score") }
 } as const;
 
-function normalizeStoredMetric(name: string, value: number | null, unit: string, status: string | null): Metric {
+function normalizeStoredMetric(name: string, value: number | null, unit: string, status: string | null, source: string): Metric {
   const id = name as MetricName;
   const cfg = NORMALIZED_BY_ID[id] ?? { unit: (unit || "") as MetricUnit, display: (v: number, u: MetricUnit) => String(v) };
   const safeUnit = unit === "" ? "" : (unit as MetricUnit);
@@ -96,7 +101,8 @@ function normalizeStoredMetric(name: string, value: number | null, unit: string,
     unit: cfg.unit ?? safeUnit,
     status: (status as MetricStatus) ?? null,
     displayValue:
-      value === null ? "Não disponível" : cfg.display(value, cfg.unit ?? safeUnit)
+      value === null ? "Não disponível" : cfg.display(value, cfg.unit ?? safeUnit),
+    source: (source as Metric["source"]) ?? "lab"
   };
 }
 
@@ -256,7 +262,7 @@ function toAnalysisRecord(row: Record<string, unknown>): AnalysisRecord {
     }),
     metrics: metrics.map((m) => {
       const mm = m as Record<string, unknown>;
-      return normalizeStoredMetric(String(mm.name), (mm.value as number | null) ?? null, String(mm.unit), (mm.status as string | null) ?? null);
+      return normalizeStoredMetric(String(mm.name), (mm.value as number | null) ?? null, String(mm.unit), (mm.status as string | null) ?? null, String(mm.source ?? "lab"));
     }),
     audits: audits.map((a) => {
       const aa = a as Record<string, unknown>;
@@ -268,13 +274,37 @@ function toAnalysisRecord(row: Record<string, unknown>): AnalysisRecord {
         numericValue: (aa.numericValue as number | null) ?? null,
         displayValue: aa.displayValue ? String(aa.displayValue) : undefined,
         severity: aa.severity as Audit["severity"],
-        impact: aa.impact as Audit["impact"]
+        impact: aa.impact as Audit["impact"],
+        source: (aa.source as Audit["source"]) ?? "lab"
       };
       return result;
     }),
     recommendations: recommendations.map((r) =>
       toRecommendation(r as unknown as StoredRecommendation)
-    )
+    ),
+    webPageTest: row.webPageTestTestId
+      ? toWebPageTestSummary(row)
+      : null
+  };
+}
+
+function toWebPageTestSummary(row: Record<string, unknown>): import("../../types/webpagetest.js").WebPageTestSummary {
+  const results = (row.webPageTestResults as unknown[]) ?? [];
+  const r = (results[0] as Record<string, unknown>) ?? {};
+  const metrics = Array.isArray(r.metrics) ? (r.metrics as import("../../types/analysis.js").Metric[]) : [];
+  const topRequests = Array.isArray(r.topRequests)
+    ? (r.topRequests as import("../../types/webpagetest.js").WebPageTestRequestEvidence[])
+    : [];
+  const analyzed = r.analyzedAt as Date | undefined;
+  return {
+    testId: String(row.webPageTestTestId),
+    status: (String(row.webPageTestStatus ?? r.status ?? "pending") as import("../../types/webpagetest.js").WptStatus),
+    metrics,
+    requests: Number(r.requests ?? 0),
+    bytes: Number(r.bytes ?? 0),
+    topRequests,
+    waterfallRef: r.waterfallRef ? String(r.waterfallRef) : undefined,
+    analyzedAt: (analyzed ?? new Date()).toISOString()
   };
 }
 
@@ -346,6 +376,7 @@ export class PrismaRepository implements Repository {
         fieldTtfb: input.fieldData?.metrics.find((m) => m.id === "TTFB")?.value ?? null,
         metrics: {
           create: input.metrics.map((m) => ({
+            source: "lab",
             name: m.id,
             value: m.value,
             unit: m.unit,
@@ -354,6 +385,7 @@ export class PrismaRepository implements Repository {
         },
         audits: {
           create: input.audits.map((a) => ({
+            source: "lab",
             auditId: a.auditId,
             title: a.title,
             description: a.description,
@@ -382,9 +414,10 @@ export class PrismaRepository implements Repository {
       },
       include: {
         site: { select: { id: true, name: true, url: true } },
-        metrics: { select: { name: true, value: true, unit: true, status: true } },
-        audits: { select: { auditId: true, title: true, description: true, score: true, numericValue: true, displayValue: true, severity: true, impact: true } },
-        recommendations: recommendationSelect
+        metrics: { select: { source: true, name: true, value: true, unit: true, status: true } },
+        audits: { select: { source: true, auditId: true, title: true, description: true, score: true, numericValue: true, displayValue: true, severity: true, impact: true } },
+        recommendations: recommendationSelect,
+        webPageTestResults: { select: { testId: true, status: true, metrics: true, topRequests: true, requests: true, bytes: true, waterfallRef: true, analyzedAt: true } }
       }
     });
     void metricById;
@@ -396,9 +429,10 @@ export class PrismaRepository implements Repository {
       where: { id },
       include: {
         site: { select: { id: true, name: true, url: true } },
-        metrics: { select: { name: true, value: true, unit: true, status: true } },
-        audits: { select: { auditId: true, title: true, description: true, score: true, numericValue: true, displayValue: true, severity: true, impact: true } },
-        recommendations: recommendationSelect
+        metrics: { select: { source: true, name: true, value: true, unit: true, status: true } },
+        audits: { select: { source: true, auditId: true, title: true, description: true, score: true, numericValue: true, displayValue: true, severity: true, impact: true } },
+        recommendations: recommendationSelect,
+        webPageTestResults: { select: { testId: true, status: true, metrics: true, topRequests: true, requests: true, bytes: true, waterfallRef: true, analyzedAt: true } }
       }
     });
     return analysis ? toAnalysisRecord(analysis) : null;
@@ -631,13 +665,84 @@ export class PrismaRepository implements Repository {
       take: 5,
       include: {
         site: { select: { id: true, name: true, url: true } },
-        metrics: { select: { name: true, value: true, unit: true, status: true } },
-        audits: { select: { auditId: true, title: true, description: true, score: true, numericValue: true, displayValue: true, severity: true, impact: true } },
-        recommendations: recommendationSelect
+        metrics: { select: { source: true, name: true, value: true, unit: true, status: true } },
+        audits: { select: { source: true, auditId: true, title: true, description: true, score: true, numericValue: true, displayValue: true, severity: true, impact: true } },
+        recommendations: recommendationSelect,
+        webPageTestResults: { select: { testId: true, status: true, metrics: true, topRequests: true, requests: true, bytes: true, waterfallRef: true, analyzedAt: true } }
       }
     });
     const index = rows.findIndex((r) => String(r.id) === beforeAnalysisId);
     const previous = index > 0 ? rows[index - 1] : null;
     return previous ? toAnalysisRecord(previous) : null;
+  }
+
+  // ──────────────── WebPageTest ────────────────
+
+  async attachWebPageTestDispatch(
+    analysisId: string,
+    testId: string,
+    status: string
+  ): Promise<void> {
+    await this.db.analysis.update({
+      where: { id: analysisId },
+      data: { webPageTestTestId: testId, webPageTestStatus: status }
+    });
+  }
+
+  async saveWebPageTestResult(
+    analysisId: string,
+    summary: import("../../types/webpagetest.js").WebPageTestSummary
+  ): Promise<void> {
+    await this.db.webPageTestResult.upsert({
+      where: { analysisId },
+      create: {
+        analysisId,
+        testId: summary.testId,
+        status: summary.status,
+        metrics: summary.metrics,
+        topRequests: summary.topRequests,
+        requests: summary.requests,
+        bytes: summary.bytes,
+        waterfallRef: summary.waterfallRef ?? null
+      },
+      update: {
+        testId: summary.testId,
+        status: summary.status,
+        metrics: summary.metrics,
+        topRequests: summary.topRequests,
+        requests: summary.requests,
+        bytes: summary.bytes,
+        waterfallRef: summary.waterfallRef ?? null
+      }
+    });
+    await this.db.analysis.update({
+      where: { id: analysisId },
+      data: {
+        webPageTestStatus: "completed",
+        webPageTestTestId: summary.testId,
+        webPageTestAnalyzedAt: new Date(summary.analyzedAt)
+      }
+    });
+  }
+
+  async getWebPageTestByAnalysis(
+    analysisId: string
+  ): Promise<import("../../types/webpagetest.js").WebPageTestSummary | null> {
+    const r = await this.db.webPageTestResult.findUnique({ where: { analysisId } });
+    if (!r) {
+      return null;
+    }
+    return {
+      testId: String(r.testId),
+      status: String(r.status) as import("../../types/webpagetest.js").WptStatus,
+      metrics: Array.isArray(r.metrics) ? (r.metrics as import("../../types/analysis.js").Metric[]) : [],
+      requests: Number(r.requests),
+      bytes: Number(r.bytes),
+      topRequests: Array.isArray(r.topRequests)
+        ? (r.topRequests as import("../../types/webpagetest.js").WebPageTestRequestEvidence[])
+        : [],
+      waterfallRef: r.waterfallRef ? String(r.waterfallRef) : undefined,
+      analyzedAt: (r.analyzedAt as Date).toISOString()
+    };
   }
 }

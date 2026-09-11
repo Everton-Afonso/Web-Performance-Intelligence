@@ -3,6 +3,7 @@
  */
 
 import type { Audit, Metric, Strategy } from "./analysis.js";
+import type { WebPageTestSummary } from "./webpagetest.js";
 
 /** V3: evidence-based recommendation (never a hypothesis presented as fact). */
 export interface Recommendation {
@@ -117,6 +118,8 @@ export interface AnalysisRecord {
   metrics: Metric[];
   audits: Audit[];
   recommendations: Recommendation[];
+  /** WebPageTest investigation attached when executed (RF-20..22). */
+  webPageTest?: WebPageTestSummary | null;
 }
 
 export interface CreateAnalysisInput {
@@ -214,6 +217,10 @@ export interface Repository {
   listGoalsBySite(siteId: string): Promise<GoalRecord[]>;
   upsertGoal(input: CreateGoalInput): Promise<GoalRecord>;
   deleteGoal(id: string): Promise<void>;
+  // WebPageTest advanced investigation
+  attachWebPageTestDispatch(analysisId: string, testId: string, status: string): Promise<void>;
+  saveWebPageTestResult(analysisId: string, summary: WebPageTestSummary): Promise<void>;
+  getWebPageTestByAnalysis(analysisId: string): Promise<WebPageTestSummary | null>;
 }
 
 /** Optional gateway used by AnalysisService; V1 flows may omit it. */

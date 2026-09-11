@@ -4,7 +4,8 @@ export const strategySchema = z.enum(["mobile", "desktop", "both"]);
 
 export const analyzeRequestSchema = z.object({
   url: z.string().trim().min(1, "Informe uma URL para análise."),
-  strategy: strategySchema.default("mobile")
+  strategy: strategySchema.default("mobile"),
+  deep: z.boolean().optional().default(false)
 });
 
 export type AnalyzeRequestInput = z.infer<typeof analyzeRequestSchema>;
