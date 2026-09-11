@@ -12,7 +12,18 @@ export class SitesController {
 
   async createSite(req: Request, res: Response): Promise<void> {
     const input = createSiteSchema.parse(req.body);
-    const site = await this.repository.upsertSite(input);
+    if (input.projectId) {
+      const project = await this.repository.getProjectById(input.projectId);
+      if (!project) {
+        res.status(404).json({ error: "Projeto não encontrado." });
+        return;
+      }
+    }
+    const site = await this.repository.upsertSite({
+      name: input.name,
+      url: input.url,
+      projectId: input.projectId ?? null
+    });
     res.status(201).json(site);
   }
 

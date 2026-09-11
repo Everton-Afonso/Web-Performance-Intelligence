@@ -7,6 +7,7 @@ import { ErrorMessage } from "./ErrorMessage";
 import { MetricChart } from "./MetricChart";
 import { ComparisonTable } from "./ComparisonTable";
 import { AnalysisResultView } from "./AnalysisResultView";
+import { GoalsPanel } from "./GoalsPanel";
 
 interface SiteDetailPageProps {
   siteId: string;
@@ -253,6 +254,8 @@ export function SiteDetailPage({ siteId, onBack }: SiteDetailPageProps) {
             {compareError && <ErrorMessage message={compareError} />}
             {comparison ? <ComparisonTable comparison={comparison} /> : <p>{t("compare.empty")}</p>}
           </section>
+
+          <GoalsPanel siteId={siteId} />
         </>
       )}
     </div>

@@ -6,6 +6,7 @@ import { CruxService } from "./services/crux/crux.service.js";
 import { AnalysisService } from "./services/analysis.service.js";
 import { AnalysisCache } from "./services/analysis-cache.js";
 import { PrismaRepository } from "./services/repository/prisma.repository.js";
+import { MonitoringScheduler } from "./services/monitoring/scheduler.js";
 import type { AnalysisResult } from "./types/analysis.js";
 
 function readConfig() {
@@ -48,11 +49,21 @@ function bootstrap() {
 
   const cache = new AnalysisCache<AnalysisResult>({ ttlMs: 5 * 60 * 1000 });
 
+  const scheduler = prisma && repository
+    ? new MonitoringScheduler({
+        repository,
+        analyzer: service,
+        tickIntervalMs: Number(process.env.MONITOR_TICK_MS ?? 60000)
+      })
+    : undefined;
+  scheduler?.start();
+
   const app = createApp({
     service,
     cache,
     corsOrigin: config.corsOrigin,
-    repository
+    repository,
+    scheduler
   });
 
   return {
@@ -60,8 +71,10 @@ function bootstrap() {
       console.log(`[wpintel] API listening on http://localhost:${config.port}`);
       console.log(`[wpintel] persistence: ${repository ? "enabled (PostgreSQL)" : "disabled (in-memory cache only)"}`);
       console.log(`[wpintel] CrUX field data: ${crux ? "enabled" : "disabled"}`);
+      console.log(`[wpintel] monitoring scheduler: ${scheduler ? "enabled" : "disabled"}`);
     }),
     shutdown: async () => {
+      scheduler?.stop();
       if (prisma) {
         await prisma.$disconnect();
       }

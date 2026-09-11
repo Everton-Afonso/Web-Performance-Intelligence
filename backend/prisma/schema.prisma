@@ -7,16 +7,73 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Project {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  sites     Site[]
+}
+
 model Site {
   id        String   @id @default(uuid())
   name      String
   url       String
+  projectId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
   analyses  Analysis[]
+  monitors  Monitor[]
+  alerts    Alert[]
+  goals     Goal[]
 
   @@unique([url])
   @@index([name])
+  @@index([projectId])
+}
+
+model Monitor {
+  id            String   @id @default(uuid())
+  siteId        String
+  strategy      String
+  intervalHours Int
+  enabled       Boolean  @default(true)
+  lastRunAt     DateTime?
+  nextRunAt     DateTime?
+  createdAt     DateTime @default(now())
+  site          Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([siteId])
+  @@index([enabled, nextRunAt])
+}
+
+model Alert {
+  id         String   @id @default(uuid())
+  siteId     String
+  type       String
+  metric     String
+  severity   String
+  message    String
+  analysisId String?
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  site       Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([siteId])
+  @@index([read, createdAt])
+}
+
+model Goal {
+  id        String   @id @default(uuid())
+  siteId    String
+  metric    String
+  target    Float
+  operator  String
+  createdAt DateTime @default(now())
+  site      Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, metric])
+  @@index([siteId])
 }
 
 model Analysis {

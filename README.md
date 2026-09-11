@@ -23,7 +23,7 @@ baseado em evidências (regras determinísticas, sem chaves de IA externas).
 | V1     | Auditoria funcional               | ✅ Implementado |
 | V2     | Histórico, CrUX, PostgreSQL       | ✅ Implementado |
 | V3     | IA (causa provável, recomendações)| ✅ Implementado |
-| V4/Final| Produto (monitoramento, alertas) | 🔜 Evolução |
+| V4     | Produto (monitoramento, alertas)  | ✅ Implementado |
 
 A arquitetura já separa os serviços de evolução (`services/crux`, `services/ai`,
 `services/reports`) para acomodar as próximas fases sem refatoração estrutural.
@@ -144,8 +144,8 @@ yarn dev
 ### Testes
 
 ```bash
-cd backend   && yarn test      # 105 testes unitários + integração (inclui persistência SQLite e motor V3)
-cd frontend  && yarn test      # 24 testes de componentes, fluxos e painel de recomendações
+cd backend   && yarn test      # 119 testes unitários + integração (inclui V3/V4)
+cd frontend  && yarn test      # 24 testes de componentes e fluxos
 ```
 
 ### Typecheck e build
@@ -298,7 +298,7 @@ PAGESPEED_API_KEY=xxx CRUX_API_KEY=xxx docker compose -f docker/compose.yaml up 
 │   │   ├── schema.prisma         # PostgreSQL (produção)
 │   │   ├── schema.test.prisma    # SQLite (testes)
 │   │   └── migrations/
-│   └── tests/                    # 105 testes (vitest + supertest + SQLite)
+│   └── tests/                    # 119 testes (vitest + supertest + SQLite)
 ├── frontend/
 │   ├── src/
 │   │   ├── components/           # form, score, metric cards, audits, sites, histórico, gráficos, recomendações
@@ -350,9 +350,22 @@ PAGESPEED_API_KEY=xxx CRUX_API_KEY=xxx docker compose -f docker/compose.yaml up 
 | Recomendações persistidas e exibidas no detalhe | `Recommendation` model + `RecommendationsPanel` |
 | Relatório com causa provável, recomendação, evidência, código e plano de ação | `report.service.ts` + `POST /api/reports/:id` |
 
-## Roadmap proposto (próximas fases)
+## Entregas da V4 (cobertura)
 
-- **V4**: projetos/sites, monitoramento agendado, regressão, alertas e metas.
+| Capacidade | Onde |
+| ---------- | ---- |
+| Projetos (agrupar sites) | `Project` model + `GET/POST /api/projects` |
+| Monitoramento agendado | `Monitor` model + `MonitoringScheduler` + `POST /api/monitoring` |
+| Execução manual de monitor | `POST /api/monitoring/:id/run` |
+| Detecção de regressões | `services/performance/regression.ts` (status downgrade + numérico +15%) |
+| Alertas | `Alert` model + `GET/POST /api/alerts` + contador de não lidos |
+| Metas por site | `Goal` model + `GET/POST /api/sites/:id/goals` + avaliação na execução |
+| Relatório recorrente | análises automáticas alimentam relatórios antes/depois on-demand |
+
+## Roadmap proposto (plataforma final)
+
+- **Final**: autenticação/usuários, observabilidade avançada, CI/CD completo,
+  retenção configurável e integração de todas as capacidades.
 
 ---
 

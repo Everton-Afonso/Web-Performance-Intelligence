@@ -73,8 +73,54 @@ export interface SiteRecord {
   id: string;
   name: string;
   url: string;
+  projectId?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ProjectRecord {
+  id: string;
+  name: string;
+  createdAt: string;
+  sites?: SiteRecord[];
+}
+
+export type AlertType = "regression" | "goal";
+
+export interface AlertRecord {
+  id: string;
+  siteId: string;
+  type: AlertType;
+  metric: string;
+  severity: "high" | "medium" | "low";
+  message: string;
+  analysisId: string | null;
+  read: boolean;
+  createdAt: string;
+  site?: Pick<SiteRecord, "id" | "name" | "url">;
+}
+
+export interface MonitorRecord {
+  id: string;
+  siteId: string;
+  strategy: Strategy;
+  intervalHours: number;
+  enabled: boolean;
+  lastRunAt: string | null;
+  nextRunAt: string | null;
+  createdAt: string;
+  site?: Pick<SiteRecord, "id" | "name" | "url">;
+}
+
+export type GoalOperator = "lte" | "gte";
+
+export interface GoalRecord {
+  id: string;
+  siteId: string;
+  metric: string;
+  target: number;
+  operator: GoalOperator;
+  createdAt: string;
 }
 
 export interface AnalysisSummary {
@@ -152,8 +198,7 @@ export interface ComparisonResult {
 export type Screen =
   | "analyze"
   | "sites"
-  | "siteDetail"
-  | "history"
-  | "analysisDetail"
-  | "compare"
-  | "report";
+  | "projects"
+  | "monitoring"
+  | "alerts"
+  | "siteDetail";

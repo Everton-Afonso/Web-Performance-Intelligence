@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const createSiteSchema = z.object({
   name: z.string().trim().min(1, "Informe um nome para o site."),
+  projectId: z.string().min(1).optional(),
   url: z
     .string()
     .trim()

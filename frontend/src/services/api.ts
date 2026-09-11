@@ -1,8 +1,13 @@
 import type {
+  AlertRecord,
   AnalysisRecord,
   AnalysisResult,
   AnalysisSummary,
   ComparisonResult,
+  GoalRecord,
+  GoalOperator,
+  MonitorRecord,
+  ProjectRecord,
   SiteRecord,
   Strategy
 } from "@/types/analysis";
@@ -141,6 +146,83 @@ export function generateReport(analysisId: string, baselineAnalysisId?: string):
     method: "POST",
     body: JSON.stringify({ baselineAnalysisId })
   });
+}
+
+// ──────────────── V4 Projects ────────────────
+
+export function listProjects(): Promise<ProjectRecord[]> {
+  return fetchJson("/projects");
+}
+
+export function createProject(name: string): Promise<ProjectRecord> {
+  return fetchJson("/projects", {
+    method: "POST",
+    body: JSON.stringify({ name })
+  });
+}
+
+export function getProject(id: string): Promise<ProjectRecord> {
+  return fetchJson(`/projects/${id}`);
+}
+
+// ──────────────── V4 Monitoring ────────────────
+
+export function listMonitors(): Promise<MonitorRecord[]> {
+  return fetchJson("/monitoring");
+}
+
+export function createMonitor(siteId: string, strategy: Strategy, intervalHours: number): Promise<MonitorRecord> {
+  return fetchJson("/monitoring", {
+    method: "POST",
+    body: JSON.stringify({ siteId, strategy, intervalHours })
+  });
+}
+
+export function toggleMonitor(id: string): Promise<MonitorRecord> {
+  return fetchJson(`/monitoring/${id}/toggle`, { method: "POST" });
+}
+
+export function runMonitorNow(id: string): Promise<{ analysisId: string; alertsCreated: number }> {
+  return fetchJson(`/monitoring/${id}/run`, { method: "POST" });
+}
+
+export function deleteMonitor(id: string): Promise<void> {
+  return fetchJson(`/monitoring/${id}`, { method: "DELETE" });
+}
+
+// ──────────────── V4 Alerts ────────────────
+
+export function listAlerts(options?: { siteId?: string; unreadOnly?: boolean }): Promise<AlertRecord[]> {
+  const query = new URLSearchParams();
+  if (options?.siteId) query.set("siteId", options.siteId);
+  if (options?.unreadOnly) query.set("unread", "true");
+  const qs = query.toString();
+  return fetchJson(`/alerts${qs ? `?${qs}` : ""}`);
+}
+
+export function unreadAlertsCount(): Promise<{ unread: number }> {
+  return fetchJson("/alerts/count");
+}
+
+export function markAlertRead(id: string): Promise<AlertRecord> {
+  return fetchJson(`/alerts/${id}/read`, { method: "POST" });
+}
+
+// ──────────────── V4 Goals ────────────────
+
+export function listGoalsBySite(siteId: string): Promise<GoalRecord[]> {
+  return fetchJson(`/sites/${siteId}/goals`);
+}
+
+export function upsertGoal(siteId: string, metric: string, target: number, operator: GoalOperator): Promise<GoalRecord> {
+  return fetchJson("/goals", {
+    method: "POST",
+    body: JSON.stringify({ siteId, metric, target, operator })
+  });
+}
+
+export function deleteGoal(siteId: string, goalId: string): Promise<void> {
+  return fetchJson(`/sites/${siteId}/goals/${goalId}`, { method: "DELETE" });
 }
 
 export { API_BASE };

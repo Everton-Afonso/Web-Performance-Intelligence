@@ -92,6 +92,21 @@ button {
   background: var(--accent-soft);
 }
 
+.app-nav__badge {
+  display: inline-block;
+  margin-left: 6px;
+  min-width: 18px;
+  height: 18px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  color: #fff;
+  background: var(--poor);
+  border-radius: 999px;
+  padding: 0 5px;
+}
+
 .page {
   width: min(1080px, 100% - 32px);
   margin: 0 auto;

@@ -1,10 +1,19 @@
 import type {
+  AlertRecord,
+  AlertSeverity,
+  AlertType,
   AnalysisRecord,
   AnalysisSummary,
   ComparisonResult,
   CreateAnalysisInput,
   CreateComparisonInput,
+  CreateGoalInput,
+  CreateMonitorInput,
   FieldData,
+  GoalOperator,
+  GoalRecord,
+  MonitorRecord,
+  ProjectRecord,
   Repository,
   SiteRecord
 } from "../../types/storage.js";
@@ -19,7 +28,7 @@ import { formatValue } from "../performance/normalizer.js";
 interface AnalysisDb {
   site: {
     upsert(args: Record<string, unknown>): Promise<Record<string, unknown>>;
-    findMany(): Promise<Array<Record<string, unknown>>>;
+    findMany(args?: Record<string, unknown>): Promise<Array<Record<string, unknown>>>;
     findUnique(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
   };
   analysis: {
@@ -29,6 +38,29 @@ interface AnalysisDb {
   };
   comparison: {
     create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+  };
+  project: {
+    create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+    findMany(): Promise<Array<Record<string, unknown>>>;
+    findUnique(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
+  };
+  monitor: {
+    create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+    findMany(args?: Record<string, unknown>): Promise<Array<Record<string, unknown>>>;
+    findUnique(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
+    update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+    delete(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+  };
+  alert: {
+    create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+    findMany(args?: Record<string, unknown>): Promise<Array<Record<string, unknown>>>;
+    update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+  };
+  goal: {
+    findMany(args?: Record<string, unknown>): Promise<Array<Record<string, unknown>>>;
+    upsert(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+    delete(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+    findUnique(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
   };
 }
 
@@ -142,8 +174,59 @@ function toSite(row: Record<string, unknown>): SiteRecord {
     id: String(row.id),
     name: String(row.name),
     url: String(row.url),
+    projectId: row.projectId ? String(row.projectId) : null,
     createdAt: (row.createdAt as Date).toISOString(),
     updatedAt: (row.updatedAt as Date).toISOString()
+  };
+}
+
+function toProject(row: Record<string, unknown>): ProjectRecord {
+  return {
+    id: String(row.id),
+    name: String(row.name),
+    createdAt: (row.createdAt as Date).toISOString()
+  };
+}
+
+function toMonitor(row: Record<string, unknown>): MonitorRecord {
+  const site = row.site as Record<string, unknown> | undefined;
+  return {
+    id: String(row.id),
+    siteId: String(row.siteId),
+    strategy: row.strategy as Strategy,
+    intervalHours: row.intervalHours as number,
+    enabled: Boolean(row.enabled),
+    lastRunAt: row.lastRunAt ? (row.lastRunAt as Date).toISOString() : null,
+    nextRunAt: row.nextRunAt ? (row.nextRunAt as Date).toISOString() : null,
+    createdAt: (row.createdAt as Date).toISOString(),
+    site: site ? { id: String(site.id), name: String(site.name), url: String(site.url) } : undefined
+  };
+}
+
+function toAlert(row: Record<string, unknown>): AlertRecord {
+  const site = row.site as Record<string, unknown> | undefined;
+  return {
+    id: String(row.id),
+    siteId: String(row.siteId),
+    type: row.type as AlertType,
+    metric: String(row.metric),
+    severity: row.severity as AlertSeverity,
+    message: String(row.message),
+    analysisId: row.analysisId ? String(row.analysisId) : null,
+    read: Boolean(row.read),
+    createdAt: (row.createdAt as Date).toISOString(),
+    site: site ? { id: String(site.id), name: String(site.name), url: String(site.url) } : undefined
+  };
+}
+
+function toGoal(row: Record<string, unknown>): GoalRecord {
+  return {
+    id: String(row.id),
+    siteId: String(row.siteId),
+    metric: String(row.metric),
+    target: row.target as number,
+    operator: row.operator as GoalOperator,
+    createdAt: (row.createdAt as Date).toISOString()
   };
 }
 
@@ -219,11 +302,18 @@ const recommendationSelect = {
 export class PrismaRepository implements Repository {
   constructor(private readonly db: AnalysisDb) {}
 
-  async upsertSite(input: { name: string; url: string }): Promise<SiteRecord> {
+  async upsertSite(input: { name: string; url: string; projectId?: string | null }): Promise<SiteRecord> {
     const site = await this.db.site.upsert({
       where: { url: input.url },
-      update: { name: input.name },
-      create: { name: input.name, url: input.url }
+      update: {
+        name: input.name,
+        ...(input.projectId !== undefined ? { projectId: input.projectId ?? null } : {})
+      },
+      create: {
+        name: input.name,
+        url: input.url,
+        ...(input.projectId !== undefined && input.projectId ? { projectId: input.projectId } : {})
+      }
     });
     return toSite(site);
   }
@@ -376,5 +466,178 @@ export class PrismaRepository implements Repository {
       createdAt: (created.createdAt as Date).toISOString(),
       ...result
     };
+  }
+
+  // ──────────────── V4 — Projects ────────────────
+
+  async listProjects(): Promise<ProjectRecord[]> {
+    const rows = await this.db.project.findMany();
+    return rows.map(toProject);
+  }
+
+  async createProject(name: string): Promise<ProjectRecord> {
+    const row = await this.db.project.create({ data: { name } });
+    return toProject(row);
+  }
+
+  async getProjectById(id: string): Promise<ProjectRecord | null> {
+    const row = await this.db.project.findUnique({ where: { id } });
+    return row ? toProject(row) : null;
+  }
+
+  async listSitesByProject(projectId: string): Promise<SiteRecord[]> {
+    const rows = await this.db.site.findMany({ where: { projectId } });
+    return rows.map(toSite);
+  }
+
+  // ──────────────── V4 — Monitoring ────────────────
+
+  async listMonitors(): Promise<MonitorRecord[]> {
+    const rows = await this.db.monitor.findMany({
+      include: { site: { select: { id: true, name: true, url: true } } }
+    });
+    return rows.map(toMonitor);
+  }
+
+  async getMonitorById(id: string): Promise<MonitorRecord | null> {
+    const row = await this.db.monitor.findUnique({
+      where: { id },
+      include: { site: { select: { id: true, name: true, url: true } } }
+    });
+    return row ? toMonitor(row) : null;
+  }
+
+  async createMonitor(input: CreateMonitorInput): Promise<MonitorRecord> {
+    const nextRunAt = new Date(Date.now() + input.intervalHours * 3600 * 1000);
+    const row = await this.db.monitor.create({
+      data: {
+        siteId: input.siteId,
+        strategy: input.strategy,
+        intervalHours: input.intervalHours,
+        enabled: input.enabled ?? true,
+        nextRunAt
+      },
+      include: { site: { select: { id: true, name: true, url: true } } }
+    });
+    return toMonitor(row);
+  }
+
+  async updateMonitor(
+    id: string,
+    data: Partial<{ enabled: boolean; lastRunAt: string; nextRunAt: string }>
+  ): Promise<MonitorRecord | null> {
+    const payload: Record<string, unknown> = {};
+    if (data.enabled !== undefined) payload.enabled = data.enabled;
+    if (data.lastRunAt !== undefined) payload.lastRunAt = new Date(data.lastRunAt);
+    if (data.nextRunAt !== undefined) payload.nextRunAt = new Date(data.nextRunAt);
+    const row = await this.db.monitor.update({
+      where: { id },
+      data: payload,
+      include: { site: { select: { id: true, name: true, url: true } } }
+    });
+    return toMonitor(row);
+  }
+
+  async deleteMonitor(id: string): Promise<void> {
+    await this.db.monitor.delete({ where: { id } });
+  }
+
+  async listDueMonitors(now: Date): Promise<MonitorRecord[]> {
+    const rows = await this.db.monitor.findMany({
+      where: {
+        enabled: true,
+        OR: [{ nextRunAt: null }, { nextRunAt: { lte: now } }]
+      },
+      include: { site: { select: { id: true, name: true, url: true } } }
+    });
+    return rows.map(toMonitor);
+  }
+
+  // ──────────────── V4 — Alerts ────────────────
+
+  async listAlerts(options?: { siteId?: string; unreadOnly?: boolean; limit?: number }): Promise<AlertRecord[]> {
+    const where: Record<string, unknown> = {};
+    if (options?.siteId) where.siteId = options.siteId;
+    if (options?.unreadOnly) where.read = false;
+    const rows = await this.db.alert.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: options?.limit ?? 50,
+      include: { site: { select: { id: true, name: true, url: true } } }
+    });
+    return rows.map(toAlert);
+  }
+
+  async createAlert(input: Omit<AlertRecord, "id" | "createdAt" | "read">): Promise<AlertRecord> {
+    const row = await this.db.alert.create({
+      data: {
+        siteId: input.siteId,
+        type: input.type,
+        metric: input.metric,
+        severity: input.severity,
+        message: input.message,
+        analysisId: input.analysisId ?? null
+      },
+      include: { site: { select: { id: true, name: true, url: true } } }
+    });
+    return toAlert(row);
+  }
+
+  async markAlertRead(id: string): Promise<AlertRecord | null> {
+    const row = await this.db.alert.update({
+      where: { id },
+      data: { read: true },
+      include: { site: { select: { id: true, name: true, url: true } } }
+    });
+    return toAlert(row);
+  }
+
+  async unreadAlertsCount(): Promise<number> {
+    const count = await this.db.alert.findMany({
+      where: { read: false },
+      select: { id: true }
+    });
+    return count.length;
+  }
+
+  // ──────────────── V4 — Goals ────────────────
+
+  async listGoalsBySite(siteId: string): Promise<GoalRecord[]> {
+    const rows = await this.db.goal.findMany({ where: { siteId } });
+    return rows.map(toGoal);
+  }
+
+  async upsertGoal(input: CreateGoalInput): Promise<GoalRecord> {
+    const row = await this.db.goal.upsert({
+      where: { siteId_metric: { siteId: input.siteId, metric: input.metric } },
+      update: { target: input.target, operator: input.operator },
+      create: input
+    });
+    return toGoal(row);
+  }
+
+  async deleteGoal(id: string): Promise<void> {
+    await this.db.goal.delete({ where: { id } });
+  }
+
+  async getPreviousAnalysis(
+    siteId: string,
+    strategy: Strategy,
+    beforeAnalysisId: string
+  ): Promise<AnalysisRecord | null> {
+    const rows = await this.db.analysis.findMany({
+      where: { siteId, strategy },
+      orderBy: { analyzedAt: "desc" },
+      take: 5,
+      include: {
+        site: { select: { id: true, name: true, url: true } },
+        metrics: { select: { name: true, value: true, unit: true, status: true } },
+        audits: { select: { auditId: true, title: true, description: true, score: true, numericValue: true, displayValue: true, severity: true, impact: true } },
+        recommendations: recommendationSelect
+      }
+    });
+    const index = rows.findIndex((r) => String(r.id) === beforeAnalysisId);
+    const previous = index > 0 ? rows[index - 1] : null;
+    return previous ? toAnalysisRecord(previous) : null;
   }
 }
