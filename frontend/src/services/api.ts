@@ -1,4 +1,11 @@
-import type { AnalysisResult, HealthResponse, Strategy } from "@/types/analysis";
+import type {
+  AnalysisRecord,
+  AnalysisResult,
+  AnalysisSummary,
+  ComparisonResult,
+  SiteRecord,
+  Strategy
+} from "@/types/analysis";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "/api";
 
@@ -20,14 +27,19 @@ export class NetworkError extends Error {
 
 async function parseError(res: Response): Promise<string> {
   try {
-    const body = (await res.json()) as { error?: string };
-    if (typeof body.error === "string" && body.error.length > 0) {
-      return body.error;
+    const text = await res.text();
+    try {
+      const body = JSON.parse(text) as { error?: string };
+      if (typeof body.error === "string" && body.error.length > 0) {
+        return body.error;
+      }
+    } catch {
+      return `Erro ${res.status} ao executar a solicitação.`;
     }
+    return `Erro ${res.status} ao executar a solicitação.`;
   } catch {
-    // ignore malformed body
+    return `Erro ${res.status} ao executar a solicitação.`;
   }
-  return `Erro ${res.status} ao executar a solicitação.`;
 }
 
 async function fetchJson<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -45,8 +57,15 @@ async function fetchJson<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new ApiRequestError(res.status, await parseError(res));
   }
 
+  const contentType = res.headers.get("content-type") ?? "";
+  if (contentType.includes("text/html")) {
+    // Return the raw HTML string; callers handle it directly.
+    return (await res.text()) as unknown as T;
+  }
   return (await res.json()) as T;
 }
+
+// ──────────────── V1 core ────────────────
 
 export function analyzeUrl(url: string, strategy: Strategy): Promise<AnalysisResult> {
   return fetchJson<AnalysisResult>("/analyze", {
@@ -55,8 +74,72 @@ export function analyzeUrl(url: string, strategy: Strategy): Promise<AnalysisRes
   });
 }
 
-export function getHealth(): Promise<HealthResponse> {
-  return fetchJson<HealthResponse>("/health", { method: "GET" });
+// ──────────────── V2 sites ────────────────
+
+export function listSites(): Promise<SiteRecord[]> {
+  return fetchJson<SiteRecord[]>("/sites");
+}
+
+export function createSite(name: string, url: string): Promise<SiteRecord> {
+  return fetchJson<SiteRecord>("/sites", {
+    method: "POST",
+    body: JSON.stringify({ name, url })
+  });
+}
+
+export function getSiteAnalyses(
+  siteId: string,
+  params?: { strategy?: Strategy; from?: string; to?: string; limit?: number }
+): Promise<{ site: SiteRecord; analyses: AnalysisSummary[] }> {
+  const query = new URLSearchParams();
+  if (params?.strategy) query.set("strategy", params.strategy);
+  if (params?.from) query.set("from", params.from);
+  if (params?.to) query.set("to", params.to);
+  if (params?.limit !== undefined) query.set("limit", String(params.limit));
+  const qs = query.toString();
+  return fetchJson(`/sites/${siteId}/analyses${qs ? `?${qs}` : ""}`);
+}
+
+export function getAnalysisById(id: string): Promise<AnalysisResult> {
+  return fetchJson<AnalysisRecord>(`/analyses/${id}`).then(toAnalysisResult);
+}
+
+/** Maps the persisted AnalysisRecord into the V1 AnalysisResult shape. */
+function toAnalysisResult(rec: AnalysisRecord): AnalysisResult {
+  return {
+    id: rec.id,
+    requestedUrl: rec.url,
+    finalUrl: rec.finalUrl,
+    strategy: rec.strategy,
+    analyzedAt: rec.analyzedAt,
+    performanceScore: rec.score,
+    metrics: rec.metrics,
+    audits: rec.audits,
+    failedAuditsCount: rec.audits.length,
+    highImpactCount: rec.audits.filter((a) => a.impact === "high").length,
+    warnings: [],
+    siteId: rec.siteId,
+    site: rec.site,
+    fieldData: rec.fieldData
+  };
+}
+
+export function compareAnalyses(currentId: string, baselineAnalysisId: string): Promise<ComparisonResult> {
+  return fetchJson(`/analyses/${currentId}/compare`, {
+    method: "POST",
+    body: JSON.stringify({ baselineAnalysisId })
+  });
+}
+
+/**
+ * Fetches the HTML report as a string. Callers typically create a Blob and
+ * open it in a new tab/window.
+ */
+export function generateReport(analysisId: string, baselineAnalysisId?: string): Promise<string> {
+  return fetchJson(`/reports/${analysisId}`, {
+    method: "POST",
+    body: JSON.stringify({ baselineAnalysisId })
+  });
 }
 
 export { API_BASE };

@@ -4,10 +4,11 @@ Plataforma de auditoria técnica de performance web. O usuário informa uma URL 
 um dispositivo; o sistema executa uma auditoria via **Google PageSpeed Insights /
 Lighthouse**, apresenta as principais métricas (**LCP, INP, CLS, FCP, TTFB**),
 classifica cada uma (Bom / Precisa melhorar / Ruim) e lista os problemas
-prioritários.
+prioritários. Na V2 há **histórico persistido em PostgreSQL/Prisma**, dados
+reais de usuários (**CrUX**), **comparação antes/depois** e **relatório HTML**.
 
 > Baseado na especificação consolidada `Performance_Auditor_Projeto_Completo`
-> (V1 funcional + roadmap V2/V3/V4). Este repositório implementa a **V1**.
+> (V1 funcional + roadmap V2/V3/V4). Este repositório implementa **V1 e V2**.
 >
 > **Princípio do produto:** não ser apenas um clone do PageSpeed Insights --
 > transformar dados técnicos em um plano de ação.
@@ -19,7 +20,7 @@ prioritários.
 | Versão | Objetivo                          | Status |
 | ------ | --------------------------------- | ------ |
 | V1     | Auditoria funcional               | ✅ Implementado |
-| V2     | Histórico, CrUX, PostgreSQL       | 🔜 Evolução |
+| V2     | Histórico, CrUX, PostgreSQL       | ✅ Implementado |
 | V3     | IA (causa provável, recomendações)| 🔜 Evolução |
 | V4/Final| Produto (monitoramento, alertas) | 🔜 Evolução |
 
@@ -28,31 +29,35 @@ A arquitetura já separa os serviços de evolução (`services/crux`, `services/
 
 ---
 
-## Arquitetura (V1)
+## Arquitetura (V1 + V2)
 
 ```
-FRONTEND (React + Vite + TypeScript)  -- formulário, loading, cards, dashboard
-        │  POST /api/analyze
+FRONTEND (React + Vite + TypeScript)  -- formulário, dashboard, histórico, gráficos
+        │  POST /api/analyze · /api/sites · /api/analyses/:id/compare · /api/reports/:id
         ▼
 BACKEND  (Node + Express + TypeScript)
-        │  validação · PageSpeed client · normalização · classificação · priorização
+        │  validação · PageSpeed client · CrUX client · normalização · persistência
         ▼
 PERFORMANCE ENGINE
    - normalizer.ts  (unidades e display consistentes - RF-14/CA-05)
    - classifier.ts  (limites de Core Web Vitals - RF-15)
    - prioritizer.ts (ordena audits por severidade/impacto - RF-16/CA-06)
+   - comparison.ts  (antes/depois - V2)
+        │
+        ├── PostgreSQL + Prisma (Site, Analysis, Metric, Audit, Comparison)
+        └── CrUX API (dados reais de campo - V2)
 ```
 
 - **Frontend/Backend desacoplados** (RNF-02): front consome REST, proxy Vite em dev.
-- **Segredos só no backend** (RNF-03/CA-08): `PAGESPEED_API_KEY` via variável de
-  ambiente; jamais no bundle do frontend.
+- **Segredos só no backend** (RNF-03/CA-08): `PAGESPEED_API_KEY`/`CRUX_API_KEY` via
+  variável de ambiente; jamais no bundle do frontend.
 - **Validação independente no backend** (RNF-04/RF-11): URLs são validadas duas
   vezes, mas o backend é a fonte de verdade e não chama o serviço externo em
   entradas inválidas (CA-02).
 - **Erro controlado e sem vazamento** (RNF-05/RNF-06): erros do PageSpeed viram
   respostas 4xx/5xx com mensagens compreensíveis.
-- **Testabilidade isolada** (RNF-08): normalização/classificação/validação são
-  funções puras testadas em unidade.
+- **Testabilidade isolada** (RNF-08): normalização/classificação/comparação são
+  funções puras; repositório testado com SQLite em memória.
 - **Preparado para i18n** (RNF-12): textos centralizados em `src/i18n` e números
   via `Intl`.
 
@@ -64,7 +69,9 @@ PERFORMANCE ENGINE
 | --------- | ----------------------------------------- |
 | Frontend  | React 18 · Vite · TypeScript · CSS modules |
 | Backend   | Node.js 20+ · Express · TypeScript        |
-| Motores   | Google PageSpeed Insights v5 / Lighthouse |
+| Motores   | Google PageSpeed Insights v5 / Lighthouse · CrUX API |
+| Persistência | PostgreSQL + Prisma (produção) · SQLite (testes) |
+| Relatórios| HTML (estrutura pronta para PDF na fase 6) |
 | Testes    | Vitest (backend + frontend) · Supertest   |
 | Produção  | Docker · docker compose · nginx           |
 
@@ -86,9 +93,24 @@ cp backend/.env.example backend/.env
 | `PAGESPEED_API_KEY`  | Chave opcional do PageSpeed API (nunca no frontend)  |
 | `PAGESPEED_API_URL`  | Endpoint v5 (padrão já configurado)                  |
 | `PAGESPEED_TIMEOUT_MS` | Timeout da chamada externa (padrão `60000`)        |
+| `CRUX_API_KEY`       | Chave para dados reais (usa a mesma da PageSpeed se vazio) |
+| `CRUX_API_URL`       | Endpoint CrUX v1 (padrão já configurado)             |
+| `DATABASE_URL`       | PostgreSQL usado pelo Prisma (V2)                    |
 | `CORS_ORIGIN`        | Origens permitidas (`*` para todas)                  |
 
-Sem chave, o PageSpeed ainda funciona com limites anônimos mais baixos.
+Sem chave, o PageSpeed ainda funciona com limites anônimos mais baixos (o CrUX
+fica desativado sem chave).
+
+### Migrações de banco (V2)
+
+Com o PostgreSQL rodando (ver Docker abaixo):
+
+```bash
+cd backend
+yarn prisma generate          # gera o Prisma Client
+yarn prisma:deploy            # aplica as migrations
+yarn dev
+```
 
 ### Frontend
 
@@ -107,7 +129,7 @@ cp frontend/.env.example frontend/.env
 ### Terminais separados
 
 ```bash
-# Backend  (http://localhost:3000)
+# Backend  (http://localhost:3000) -- requer Postgres (ver Docker) para V2
 cd backend
 yarn install
 yarn dev
@@ -121,8 +143,8 @@ yarn dev
 ### Testes
 
 ```bash
-cd backend   && yarn test      # 74 testes unitários + integração
-cd frontend  && yarn test      # 18 testes de componentes e fluxos
+cd backend   && yarn test      # 99 testes unitários + integração (incl. persistência com SQLite)
+cd frontend  && yarn test      # 21 testes de componentes e fluxos
 ```
 
 ### Typecheck e build
@@ -134,7 +156,7 @@ cd frontend  && yarn typecheck && yarn build
 
 ---
 
-## API (V1)
+## API
 
 ### `GET /api/health` (RF-10)
 
@@ -187,7 +209,39 @@ cd frontend  && yarn typecheck && yarn build
 | `500`  | Erro interno (nunca expõe segredos/stack)                      |
 
 Segurança: rate limiting em memória (20 análises/minuto), `Retry-After`, chave
-da API somente no servidor.
+da API somente no servidor. Na V2, `POST /api/analyze` também **persiste** a
+análise (Site + Analysis + Metric + Audit) e mescla dados de **CrUX**
+(`fieldData`) quando houver chave de API configurada.
+
+### V2 — Sites e histórico
+
+| Método | Rota                                   | Descrição                                |
+| ------ | -------------------------------------- | ---------------------------------------- |
+| GET    | `/api/sites`                           | Lista sites cadastrados                  |
+| POST   | `/api/sites`                           | Cadastra site `{ name, url }`            |
+| GET    | `/api/sites/:id`                       | Detalhe do site                          |
+| GET    | `/api/sites/:id/analyses`              | Histórico (`?strategy=&from=&to=&limit=`)|
+| GET    | `/api/analyses/:id`                    | Análise completa (métricas, audits, field)|
+
+### V2 — Comparação e relatório
+
+| Método | Rota                             | Descrição                                    |
+| ------ | -------------------------------- | -------------------------------------------- |
+| POST   | `/api/analyses/:id/compare`      | `{ baselineAnalysisId }` → antes/depois      |
+| POST   | `/api/reports/:id`               | Gera relatório HTML (opcional `baselineAnalysisId`) |
+
+Exemplo de comparação (resposta 201):
+
+```json
+{
+  "scoreBefore": 50, "scoreAfter": 85, "scoreDelta": 35, "scorePct": 70,
+  "scoreDirection": "improved",
+  "metrics": [
+    { "metricId": "LCP", "before": {...}, "after": {...},
+      "delta": -1700, "pctChange": -44.7, "direction": "improved" }
+  ]
+}
+```
 
 Limites de Core Web Vitals aplicados (seção 2 do documento):
 
@@ -206,13 +260,17 @@ antes de produção, conforme nota do documento.)*
 
 ## Docker
 
+O compose sobe **PostgreSQL**, **backend** e **frontend**; o backend aplica as
+migrations automaticamente na subida (`prisma migrate deploy`):
+
 ```bash
-PAGESPEED_API_KEY=xxx docker compose -f docker/compose.yaml up --build
+PAGESPEED_API_KEY=xxx CRUX_API_KEY=xxx docker compose -f docker/compose.yaml up --build
 ```
 
+- Postgres em `localhost:5433` (wpintel/wpintel) — volume persistente `pgdata`
 - Backend em `http://localhost:3000`
 - Frontend em `http://localhost:8080` (nginx, proxy `/api` → backend)
-- Healthchecks em ambos os serviços
+- Healthchecks em todos os serviços
 
 ---
 
@@ -233,30 +291,34 @@ PAGESPEED_API_KEY=xxx docker compose -f docker/compose.yaml up --build
 │   │   ├── middleware/           # error-handler, rate-limit, async-handler
 │   │   ├── types/
 │   │   ├── app.ts                # fábrica da aplicação (testável)
-│   │   └── index.ts              # bootstrap
-│   └── tests/                    # 74 testes (vitest + supertest)
+│   │   └── index.ts              # bootstrap (Prisma, CrUX, repositories)
+│   ├── prisma/
+│   │   ├── schema.prisma         # PostgreSQL (produção)
+│   │   ├── schema.test.prisma    # SQLite (testes)
+│   │   └── migrations/
+│   └── tests/                    # 99 testes (vitest + supertest + SQLite)
 ├── frontend/
 │   ├── src/
-│   │   ├── components/           # form, score, metric cards, audits, loading, error
-│   │   ├── pages/                # AnalysisPage (dashboard V1)
-│   │   ├── services/             # api.ts
+│   │   ├── components/           # form, score, metric cards, audits, sites, histórico, gráficos
+│   │   ├── pages/                # AnalysisPage (Nova análise)
+│   │   ├── services/             # api.ts (V1 + V2)
 │   │   ├── hooks/                # useAnalysis (estados + bloqueio de duplicados)
 │   │   ├── i18n/                 # dicionários pt-BR/en-US
 │   │   ├── types/
 │   │   └── styles/
-│   └── tests/                    # 18 testes (testing-library)
+│   └── tests/                    # 21 testes (testing-library)
 ├── docker/compose.yaml
 └── README.md
 ```
 
 ---
 
-## Critérios de aceite da V1 (cobertura)
+## Critérios de aceite — V1 (cobertura)
 
 | Critério | Onde |
 | -------- | ---- |
 | CA-01 URL válida inicia análise | `tests/url.validator` + integração `POST /api/analyze` |
-| CA-02 URL inválida sem chamada externa | benefício: teste conta chamadas externas |
+| CA-02 URL inválida sem chamada externa | teste conta chamadas externas |
 | CA-03 Mobile/Desktop distintos | `strategy` no payload + testes |
 | CA-04 Score e métricas | `AnalysisResultView` + integração |
 | CA-05 CLS 2 casas, temporais em ms | `normalizer.test.ts` |
@@ -264,12 +326,22 @@ PAGESPEED_API_KEY=xxx docker compose -f docker/compose.yaml up --build
 | CA-07 Falhas compreensíveis | `error-handler` + testes de API |
 | CA-08 Chave fora do bundle | `grep` no `dist/` do frontend |
 
+## Entregas da V2 (cobertura)
+
+| Capacidade | Onde |
+| ---------- | ---- |
+| Postgres + Prisma (Site/Analysis/Metric/Audit/Comparison) | `prisma/schema.prisma` + `prisma.repository.ts` |
+| Histórico por URL, data e estratégia | `GET /api/sites/:id/analyses` + testes SQLite |
+| CrUX (dados reais) | `crux.service.ts` + `parseCruxRecord` + testes |
+| Comparação antes/depois | `comparison.ts` + `POST /api/analyses/:id/compare` |
+| Relatório HTML | `report.service.ts` + `POST /api/reports/:id` + testes |
+| Dashboard com histórico e gráficos | `SitesPage` + `SiteDetailPage` + `MetricChart` |
+
 ## Roadmap proposto (próximas fases)
 
-- **V2**: PostgreSQL + Prisma (análises, métricas, audits), histórico por
-  URL/data/estratégia, CrUX, comparação antes/depois, relatório HTML/PDF.
 - **V3**: camada IA interpretando métricas e audits, agrupando problemas,
-  causa provável, priorização por impacto e sugestões de código.
+  causa provável, priorização por impacto e sugestões de código
+  (`services/ai/` já reservado; modelo `Recommendation` já no schema).
 - **V4**: projetos/sites, monitoramento agendado, regressão, alertas e metas.
 
 ---
@@ -279,5 +351,6 @@ PAGESPEED_API_KEY=xxx docker compose -f docker/compose.yaml up --build
 - Integrações externas, limites de Core Web Vitals e detalhes das APIs devem ser
   revalidados contra as versões oficiais atuais antes de produção (seção 16 do
   documento).
-- Política de retenção (RNF-13): na V1 nada é persistido; o cache em memória é
-  apenas de curto prazo (5 min) para evitar análises duplicadas (RNF-14).
+- Política de retenção (RNF-13): o cache em memória (5 min) evita análises
+  duplicadas (RNF-14); o histórico é persistido no PostgreSQL e seu período de
+  retenção é configurável no chão de dados.

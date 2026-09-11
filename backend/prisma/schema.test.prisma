@@ -1,0 +1,105 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/@wpintel/prisma-test"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL_TEST")
+}
+
+// Test-only schema: mirrors schema.prisma using SQLite so repository tests run
+// without a Postgres server. Keep the models in sync when schema.prisma changes.
+
+model Site {
+  id        String   @id @default(uuid())
+  name      String
+  url       String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  analyses  Analysis[]
+
+  @@unique([url])
+  @@index([name])
+}
+
+model Analysis {
+  id          String   @id @default(uuid())
+  siteId      String
+  url         String
+  strategy    String
+  score       Float
+  analyzedAt  DateTime
+  finalUrl    String
+  fetchTime   DateTime
+  fieldLcp    Float?
+  fieldInp    Float?
+  fieldCls    Float?
+  fieldFcp    Float?
+  fieldTtfb   Float?
+  site        Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  metrics     Metric[]
+  audits      Audit[]
+  recommendations Recommendation[]
+  baselineOf  Comparison[] @relation("BaselineComparison")
+  currentOf   Comparison[] @relation("CurrentComparison")
+
+  @@index([siteId, strategy, analyzedAt])
+  @@index([url, strategy, analyzedAt])
+}
+
+model Metric {
+  id         String  @id @default(uuid())
+  analysisId String
+  name       String
+  value      Float?
+  unit       String
+  status     String?
+  analysis   Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+  @@index([name])
+}
+
+model Audit {
+  id          String  @id @default(uuid())
+  analysisId  String
+  auditId     String
+  title       String
+  description String
+  score       Float?
+  numericValue Float?
+  displayValue String?
+  severity    String
+  impact      String
+  analysis    Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+}
+
+model Comparison {
+  id                 String   @id @default(uuid())
+  baselineAnalysisId String
+  currentAnalysisId  String
+  createdAt          DateTime @default(now())
+  results            Json
+  baselineAnalysis   Analysis @relation("BaselineComparison", fields: [baselineAnalysisId], references: [id], onDelete: Cascade)
+  currentAnalysis    Analysis @relation("CurrentComparison", fields: [currentAnalysisId], references: [id], onDelete: Cascade)
+
+  @@index([baselineAnalysisId])
+  @@index([currentAnalysisId])
+}
+
+model Recommendation {
+  id           String  @id @default(uuid())
+  analysisId   String
+  targetType   String
+  targetId     String
+  priority     String
+  title        String
+  description  String
+  suggestedFix String?
+  analysis     Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+}

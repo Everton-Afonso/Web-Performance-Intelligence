@@ -6,6 +6,8 @@
  * evolve (CrUX, comparisons, AI) without breaking the API contract.
  */
 
+import type { FieldData } from "./storage.js";
+
 export type Strategy = "mobile" | "desktop";
 
 export type MetricStatus = "good" | "needs-improvement" | "poor";
@@ -75,6 +77,15 @@ export interface AnalysisResult {
   failedAuditsCount: number;
   highImpactCount: number;
   warnings: string[];
+  /** Populated only when a repository is configured (V2). */
+  siteId?: string;
+  site?: {
+    id: string;
+    name: string;
+    url: string;
+  };
+  /** Field (CrUX) data collected for this URL origin. V2. */
+  fieldData?: FieldData | null;
 }
 
 export interface HealthResponse {

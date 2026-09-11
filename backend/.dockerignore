@@ -5,3 +5,6 @@ dist
 tests
 Dockerfile
 .gitignore
+prisma/*.db
+prisma/*.db-journal
+prisma/migrations/migration.sql

@@ -1,15 +1,19 @@
 /**
- * Orchestration of a full V1 analysis (RF-03/04/05/06/07/08/17/18).
+ * Orchestration of a full analysis (V1 + V2 additions).
  *
  * Responsibilities:
  * - drive the PageSpeed fetch
  * - translate API-level failures into controlled errors (RF-18 / RNF-06)
  * - normalize and classify metrics
  * - prioritize failed audits
+ * - (V2) optionally fetch field data via CrUX
+ * - (V2) optionally persist the analysis (repository)
  */
 
 import type { AnalysisRequest, AnalysisResult, MetricSource, Strategy } from "../types/analysis.js";
+import type { FieldData, Repository } from "../types/storage.js";
 import { PageSpeedService } from "./pagespeed/client.js";
+import { CruxService } from "./crux/crux.service.js";
 import {
   extractFailedAudits,
   extractFinalUrl,
@@ -30,12 +34,28 @@ export class PageSpeedRequestError extends Error {
   }
 }
 
-const STRATEGY: Strategy[] = ["mobile", "desktop"];
-
 const PERFORMANCE_SCORE_NAME = "Performance Score";
 
+export interface AnalysisDeps {
+  pageSpeed: PageSpeedService;
+  repository?: Repository;
+  crux?: CruxService;
+}
+
 export class AnalysisService {
-  constructor(private readonly pageSpeed: PageSpeedService) {}
+  private readonly pageSpeed: PageSpeedService;
+  private readonly repository?: Repository;
+  private readonly crux?: CruxService;
+
+  constructor(deps: PageSpeedService | AnalysisDeps) {
+    if ("pageSpeed" in deps) {
+      this.pageSpeed = deps.pageSpeed;
+      this.repository = deps.repository;
+      this.crux = deps.crux;
+    } else {
+      this.pageSpeed = deps;
+    }
+  }
 
   async analyze(request: AnalysisRequest): Promise<AnalysisResult> {
     const url = parseUrlOrThrow(request.url);
@@ -50,12 +70,11 @@ export class AnalysisService {
 
     const lighthouse = response.lighthouseResult;
     const score = extractPerformanceScore(lighthouse);
-    const scoreUnit = "score" as const;
     const scoreSource: MetricSource = {
       id: "performance-score",
       name: PERFORMANCE_SCORE_NAME,
       value: score,
-      unit: scoreUnit
+      unit: "score"
     };
 
     const rawMetrics = extractPerformanceMetrics(lighthouse);
@@ -66,11 +85,49 @@ export class AnalysisService {
     const counts = countAudits(audits);
 
     const analyzedAt = lighthouse?.fetchTime ?? response.analysisUTCTimestamp ?? new Date().toISOString();
+    const fetchTime = analyzedAt;
+    const finalUrl = extractFinalUrl(lighthouse, url);
+
+    // V2: fetch field data when CrUX service is configured
+    const fieldData: FieldData | null = this.crux
+      ? await this.crux.fetchFieldData(url)
+      : null;
+
+    let resultId = response.id ?? `${url}::${strategy}`;
+    let siteId: string | undefined;
+    let siteInfo: { id: string; name: string; url: string } | undefined;
+
+    // V2: persist when repository is configured
+    if (this.repository) {
+      let origin = url;
+      try {
+        origin = new URL(url).origin;
+      } catch {
+        // ignore
+      }
+      const site = await this.repository.upsertSite({ name: origin, url: origin });
+      const labMetrics = metrics.filter((m) => m.id !== "performance-score");
+      const created = await this.repository.createAnalysis({
+        siteId: site.id,
+        url,
+        finalUrl,
+        strategy,
+        score: score,
+        analyzedAt,
+        fetchTime,
+        fieldData,
+        metrics: labMetrics,
+        audits
+      });
+      resultId = created.id;
+      siteId = created.siteId;
+      siteInfo = { id: created.site.id, name: created.site.name, url: created.site.url };
+    }
 
     return {
-      id: response.id ?? `${url}::${strategy}`,
+      id: resultId,
       requestedUrl: url,
-      finalUrl: extractFinalUrl(lighthouse, url),
+      finalUrl,
       strategy,
       analyzedAt,
       performanceScore: score,
@@ -78,7 +135,10 @@ export class AnalysisService {
       audits,
       failedAuditsCount: counts.total,
       highImpactCount: counts.highImpact,
-      warnings: extractWarnings(lighthouse)
+      warnings: extractWarnings(lighthouse),
+      siteId,
+      site: siteInfo,
+      fieldData: fieldData ?? undefined
     };
   }
 
