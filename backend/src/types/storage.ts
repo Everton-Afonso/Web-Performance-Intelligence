@@ -54,6 +54,27 @@ export interface MonitorRecord {
   site?: Pick<SiteRecord, "id" | "name" | "url">;
 }
 
+export interface MonitorRunRecord {
+  id: string;
+  monitorId: string;
+  status: "ok" | "error";
+  analysisId: string | null;
+  alertsCreated: number;
+  message: string | null;
+  startedAt: string;
+  durationMs: number;
+}
+
+export interface CreateMonitorRunInput {
+  monitorId: string;
+  status: MonitorRunRecord["status"];
+  analysisId?: string | null;
+  alertsCreated?: number;
+  message?: string | null;
+  startedAt: string;
+  durationMs: number;
+}
+
 export type AlertType = "regression" | "goal";
 export type AlertSeverity = "high" | "medium" | "low";
 
@@ -146,6 +167,8 @@ export interface AnalysisSummary {
   failedAuditsCount: number;
   highImpactCount: number;
   site: Pick<SiteRecord, "id" | "name" | "url">;
+  /** metricId -> numeric value (only when the summary was requested with includeMetrics). */
+  metricValues?: Record<string, number | null>;
 }
 
 export interface MetricComparison {
@@ -193,7 +216,13 @@ export interface Repository {
   ): Promise<AnalysisRecord | null>;
   listAnalysesBySite(
     siteId: string,
-    options?: { strategy?: Strategy; from?: string; to?: string; limit?: number }
+    options?: {
+      strategy?: Strategy;
+      from?: string;
+      to?: string;
+      limit?: number;
+      includeMetrics?: boolean;
+    }
   ): Promise<AnalysisSummary[]>;
   createComparison(input: CreateComparisonInput): Promise<ComparisonResult>;
   // V4 — Projects
@@ -208,6 +237,8 @@ export interface Repository {
   updateMonitor(id: string, data: Partial<{ enabled: boolean; lastRunAt: string; nextRunAt: string }>): Promise<MonitorRecord | null>;
   deleteMonitor(id: string): Promise<void>;
   listDueMonitors(now: Date): Promise<MonitorRecord[]>;
+  createMonitorRun(input: CreateMonitorRunInput): Promise<MonitorRunRecord>;
+  listMonitorRuns(monitorId: string, limit?: number): Promise<MonitorRunRecord[]>;
   // V4 — Alerts
   listAlerts(options?: { siteId?: string; unreadOnly?: boolean; limit?: number }): Promise<AlertRecord[]>;
   createAlert(input: Omit<AlertRecord, "id" | "createdAt" | "read">): Promise<AlertRecord>;

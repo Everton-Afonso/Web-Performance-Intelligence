@@ -42,12 +42,13 @@ export class SitesController {
       res.status(404).json({ error: "Site não encontrado." });
       return;
     }
-    const { strategy, from, to, limit } = req.query as Record<string, string | undefined>;
+    const { strategy, from, to, limit, includeMetrics } = req.query as Record<string, string | undefined>;
     const analyses = await this.repository.listAnalysesBySite(site.id, {
       strategy: strategy as "mobile" | "desktop" | undefined,
       from,
       to,
-      limit: limit ? Math.min(100, Math.max(1, parseInt(limit, 10))) : undefined
+      limit: limit ? Math.min(100, Math.max(1, parseInt(limit, 10))) : undefined,
+      includeMetrics: includeMetrics === "true"
     });
     res.json({ site, analyses });
   }

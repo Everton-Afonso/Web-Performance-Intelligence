@@ -26,6 +26,7 @@ export function createV4Router(
   router.post("/monitoring/:id/toggle", asyncHandler(monitoring.toggle.bind(monitoring)));
   router.post("/monitoring/:id/run", asyncHandler(monitoring.runNow.bind(monitoring)));
   router.delete("/monitoring/:id", asyncHandler(monitoring.remove.bind(monitoring)));
+  router.get("/monitoring/:id/runs", asyncHandler(monitoring.runs.bind(monitoring)));
 
   // Alerts
   const alerts = new AlertsController(repository);

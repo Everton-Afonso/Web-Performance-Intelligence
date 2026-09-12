@@ -9,10 +9,12 @@ import type {
   CreateComparisonInput,
   CreateGoalInput,
   CreateMonitorInput,
+  CreateMonitorRunInput,
   FieldData,
   GoalOperator,
   GoalRecord,
   MonitorRecord,
+  MonitorRunRecord,
   ProjectRecord,
   Repository,
   SiteRecord
@@ -55,6 +57,10 @@ interface AnalysisDb {
     findUnique(args: Record<string, unknown>): Promise<Record<string, unknown> | null>;
     update(args: Record<string, unknown>): Promise<Record<string, unknown>>;
     delete(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+  };
+  monitorRun: {
+    create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
+    findMany(args?: Record<string, unknown>): Promise<Array<Record<string, unknown>>>;
   };
   alert: {
     create(args: Record<string, unknown>): Promise<Record<string, unknown>>;
@@ -206,6 +212,19 @@ function toMonitor(row: Record<string, unknown>): MonitorRecord {
     nextRunAt: row.nextRunAt ? (row.nextRunAt as Date).toISOString() : null,
     createdAt: (row.createdAt as Date).toISOString(),
     site: site ? { id: String(site.id), name: String(site.name), url: String(site.url) } : undefined
+  };
+}
+
+function toMonitorRun(row: Record<string, unknown>): MonitorRunRecord {
+  return {
+    id: String(row.id),
+    monitorId: String(row.monitorId),
+    status: row.status as MonitorRunRecord["status"],
+    analysisId: row.analysisId ? String(row.analysisId) : null,
+    alertsCreated: Number(row.alertsCreated ?? 0),
+    message: row.message ? String(row.message) : null,
+    startedAt: (row.startedAt as Date).toISOString(),
+    durationMs: Number(row.durationMs ?? 0)
   };
 }
 
@@ -440,7 +459,7 @@ export class PrismaRepository implements Repository {
 
   async listAnalysesBySite(
     siteId: string,
-    options?: { strategy?: Strategy; from?: string; to?: string; limit?: number }
+    options?: { strategy?: Strategy; from?: string; to?: string; limit?: number; includeMetrics?: boolean }
   ): Promise<AnalysisSummary[]> {
     const analyzedAt: Record<string, Date> = {};
     if (options?.from) {
@@ -463,13 +482,22 @@ export class PrismaRepository implements Repository {
       take: options?.limit ?? 25,
       include: {
         site: { select: { id: true, name: true, url: true } },
-        audits: { select: { impact: true } }
+        audits: { select: { impact: true } },
+        metrics: options?.includeMetrics
+          ? { select: { name: true, value: true } }
+          : false
       }
     });
 
     return rows.map((a) => {
       const site = a.site as Record<string, unknown>;
       const audits = (a.audits as Array<Record<string, unknown>>) ?? [];
+      const metrics = (a.metrics ?? []) as Array<Record<string, unknown>>;
+      const metricValues: Record<string, number | null> = {};
+      for (const m of metrics) {
+        const v = m.value as number | null;
+        metricValues[String(m.name)] = v === null ? null : v;
+      }
       return {
         id: String(a.id),
         url: String(a.url),
@@ -479,7 +507,8 @@ export class PrismaRepository implements Repository {
         analyzedAt: (a.analyzedAt as Date).toISOString(),
         failedAuditsCount: audits.length,
         highImpactCount: audits.filter((x) => x.impact === "high").length,
-        site: { id: String(site.id), name: String(site.name), url: String(site.url) }
+        site: { id: String(site.id), name: String(site.name), url: String(site.url) },
+        ...(options?.includeMetrics ? { metricValues } : {})
       };
     });
   }
@@ -585,6 +614,30 @@ export class PrismaRepository implements Repository {
       include: { site: { select: { id: true, name: true, url: true } } }
     });
     return rows.map(toMonitor);
+  }
+
+  async createMonitorRun(input: CreateMonitorRunInput): Promise<MonitorRunRecord> {
+    const row = await this.db.monitorRun.create({
+      data: {
+        monitorId: input.monitorId,
+        status: input.status,
+        analysisId: input.analysisId ?? null,
+        alertsCreated: input.alertsCreated ?? 0,
+        message: input.message ?? null,
+        startedAt: new Date(input.startedAt),
+        durationMs: input.durationMs
+      }
+    });
+    return toMonitorRun(row);
+  }
+
+  async listMonitorRuns(monitorId: string, limit = 10): Promise<MonitorRunRecord[]> {
+    const rows = await this.db.monitorRun.findMany({
+      where: { monitorId },
+      orderBy: { createdAt: "desc" },
+      take: limit
+    });
+    return rows.map(toMonitorRun);
   }
 
   // ──────────────── V4 — Alerts ────────────────

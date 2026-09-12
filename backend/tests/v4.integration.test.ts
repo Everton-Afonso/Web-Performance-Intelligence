@@ -115,6 +115,13 @@ describe("V4 — Monitoring", () => {
     expect(monitors[0]!.lastRunAt).toBeTruthy();
     expect(monitors[0]!.nextRunAt).toBe("2026-09-15T16:00:00.000Z");
 
+    // run log recorded
+    const runs = await repository.listMonitorRuns(created.body.id);
+    expect(runs.length).toBeGreaterThanOrEqual(1);
+    expect(runs[0]!.status).toBe("ok");
+    expect(runs[0]!.analysisId).toBe(run.body.analysisId);
+    expect(runs[0]!.durationMs).toBeGreaterThanOrEqual(0);
+
     // delete
     const del = await request(app).delete(`/api/monitoring/${created.body.id}`);
     expect(del.status).toBe(204);

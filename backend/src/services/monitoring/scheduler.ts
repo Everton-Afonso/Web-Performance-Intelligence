@@ -91,6 +91,7 @@ export class MonitoringScheduler {
       return { monitorId: monitor.id, analysisId: null, alertsCreated: 0, error: "Monitor já em execução." };
     }
     this.running.add(monitor.id);
+    const startedAt = new Date();
 
     try {
       const now = this.now();
@@ -149,6 +150,16 @@ export class MonitoringScheduler {
         nextRunAt: nextRunAt.toISOString()
       });
 
+      await this.repository.createMonitorRun({
+        monitorId: monitor.id,
+        status: "ok",
+        analysisId: result.id,
+        alertsCreated,
+        message: alertsCreated > 0 ? `${alertsCreated} alerta(s) gerado(s)` : "Sem problemas detectados.",
+        startedAt: startedAt.toISOString(),
+        durationMs: Date.now() - startedAt.getTime()
+      });
+
       return { monitorId: monitor.id, analysisId: result.id, alertsCreated };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -158,6 +169,13 @@ export class MonitoringScheduler {
       await this.repository.updateMonitor(monitor.id, {
         lastRunAt: now.toISOString(),
         nextRunAt: nextRunAt.toISOString()
+      });
+      await this.repository.createMonitorRun({
+        monitorId: monitor.id,
+        status: "error",
+        message,
+        startedAt: startedAt.toISOString(),
+        durationMs: Date.now() - startedAt.getTime()
       });
       return { monitorId: monitor.id, analysisId: null, alertsCreated: 0, error: message };
     } finally {

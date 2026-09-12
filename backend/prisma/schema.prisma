@@ -42,9 +42,25 @@ model Monitor {
   nextRunAt     DateTime?
   createdAt     DateTime @default(now())
   site          Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  runs          MonitorRun[]
 
   @@index([siteId])
   @@index([enabled, nextRunAt])
+}
+
+model MonitorRun {
+  id           String   @id @default(uuid())
+  monitorId    String
+  status       String
+  analysisId   String?
+  alertsCreated Int     @default(0)
+  message      String?
+  startedAt    DateTime
+  durationMs   Int      @default(0)
+  createdAt    DateTime @default(now())
+  monitor      Monitor  @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+
+  @@index([monitorId, createdAt])
 }
 
 model Alert {

@@ -51,6 +51,18 @@ export class MonitoringController {
     res.status(204).end();
   }
 
+  async runs(req: Request, res: Response): Promise<void> {
+    const monitor = await this.repository.getMonitorById(req.params.id!);
+    if (!monitor) {
+      res.status(404).json({ error: "Monitor não encontrado." });
+      return;
+    }
+    const limitRaw = req.query.limit as string | undefined;
+    const limit = limitRaw ? Math.min(50, Math.max(1, parseInt(limitRaw, 10))) : 10;
+    const runs = await this.repository.listMonitorRuns(monitor.id, limit);
+    res.json(runs);
+  }
+
   // eslint-disable-next-line @typescript-eslint/require-await
   async runNow(req: Request, res: Response): Promise<void> {
     if (!this.scheduler) {
