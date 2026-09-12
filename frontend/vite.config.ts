@@ -19,5 +19,15 @@ export default defineConfig({
         proxyTimeout: 120000
       }
     }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          recharts: ["recharts"],
+          vendor: ["react", "react-dom", "react-router-dom"]
+        }
+      }
+    }
   }
 });

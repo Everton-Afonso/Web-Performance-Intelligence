@@ -1,12 +1,11 @@
 # Web Performance Intelligence -- Performance Auditor
 
-Plataforma de auditoria técnica de performance web. O usuário informa uma URL e
-um dispositivo; o sistema executa uma auditoria via **Google PageSpeed Insights /
-Lighthouse**, apresenta as principais métricas (**LCP, INP, CLS, FCP, TTFB**),
-classifica cada uma (Bom / Precisa melhorar / Ruim), lista os problemas
-prioritários e, a partir da V3, **explica o porquê, o que corrigir primeiro,
-como corrigir, e se a correção realmente melhorou** via um motor de diagnóstico
-baseado em evidências (regras determinísticas, sem chaves de IA externas).
+Plataforma de auditoria técnica de performance web com **redesign profissional** (prompt
+"Redesign profissional do Performance Auditor") — dashboard SaaS/observabilidade com sidebar,
+Overview executivo (score em gauge, Core Web Vitals com sparklines, Performance over time,
+Mobile vs Desktop, Before vs After, distribuição de recursos, third-party, AI insights, goals e
+priority issues), páginas de Histórico, Comparações, Relatórios (com prévia), Metas e
+Configurações — preservando toda a lógica de negócio das fontes de dados.
 
 > Baseado na especificação consolidada `Performance_Auditor_Projeto_Completo`
 > (V1 funcional + roadmap V2/V3/V4). Este repositório implementa **V1, V2 e V3**.
@@ -141,6 +140,11 @@ cd frontend
 yarn install
 yarn dev
 ```
+
+> **Modo local vs Docker:** o container `wpintel-backend` publica a porta 3000. Para rodar o
+> backend local, use `yarn dev:local` (para o container do backend + inicia o `yarn dev`) ou
+> `yarn stop:docker` (só para o container). O Postgres (`db`) e o frontend Docker podem
+> continuar rodando.
 
 ### Testes
 

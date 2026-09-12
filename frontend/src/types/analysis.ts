@@ -128,6 +128,17 @@ export interface MonitorRecord {
   site?: Pick<SiteRecord, "id" | "name" | "url">;
 }
 
+export interface MonitorRunRecord {
+  id: string;
+  monitorId: string;
+  status: "ok" | "error";
+  analysisId: string | null;
+  alertsCreated: number;
+  message: string | null;
+  startedAt: string;
+  durationMs: number;
+}
+
 export type GoalOperator = "lte" | "gte";
 
 export interface GoalRecord {
@@ -149,6 +160,7 @@ export interface AnalysisSummary {
   failedAuditsCount: number;
   highImpactCount: number;
   site: Pick<SiteRecord, "id" | "name" | "url">;
+  metricValues?: Record<string, number | null>;
 }
 
 export interface FieldData {

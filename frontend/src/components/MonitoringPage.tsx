@@ -1,12 +1,17 @@
 import { useEffect, useState } from "react";
-import type { MonitorRecord, SiteRecord, Strategy } from "@/types/analysis";
-import { listMonitors, createMonitor, toggleMonitor, runMonitorNow, deleteMonitor, listSites, ApiRequestError } from "@/services/api";
+import type { MonitorRecord, MonitorRunRecord, SiteRecord, Strategy } from "@/types/analysis";
+import { listMonitors, createMonitor, toggleMonitor, runMonitorNow, deleteMonitor, listSites, listMonitorRuns, ApiRequestError } from "@/services/api";
 import { useI18n } from "@/i18n";
 import { LoadingState } from "./LoadingState";
 import { ErrorMessage } from "./ErrorMessage";
 
 interface Props {
   onBack: () => void;
+}
+
+interface RunsState {
+  loadingId: string | null;
+  runs: Record<string, MonitorRunRecord[]>;
 }
 
 export function MonitoringPage({ onBack }: Props) {
@@ -20,6 +25,17 @@ export function MonitoringPage({ onBack }: Props) {
   const [intervalHours, setIntervalHours] = useState(6);
   const [creating, setCreating] = useState(false);
   const [creatingError, setCreatingError] = useState<string | null>(null);
+  const [runsState, setRunsState] = useState<RunsState>({ loadingId: null, runs: {} });
+
+  const loadRuns = async (monitorId: string) => {
+    setRunsState((s) => ({ ...s, loadingId: monitorId }));
+    try {
+      const runs = await listMonitorRuns(monitorId);
+      setRunsState((s) => ({ loadingId: null, runs: { ...s.runs, [monitorId]: runs } }));
+    } catch {
+      setRunsState((s) => ({ ...s, loadingId: null }));
+    }
+  };
 
   const load = async () => {
     try {
@@ -87,7 +103,7 @@ export function MonitoringPage({ onBack }: Props) {
 
       <ul className="sites__list">
         {monitors.map((m) => (
-          <li key={m.id} className="sites__item">
+          <li key={m.id} className="sites__item monitor">
             <div className="sites__info">
               <strong className="sites__name">{m.site?.name ?? m.siteId}</strong>
               <span className="sites__url">{m.strategy} · a cada {m.intervalHours}h · {m.enabled ? t("monitoring.enabled") : t("monitoring.disabled")}</span>
@@ -95,11 +111,33 @@ export function MonitoringPage({ onBack }: Props) {
                 Último: {m.lastRunAt ? date(m.lastRunAt) : "—"} · Próximo: {m.nextRunAt ? date(m.nextRunAt) : "—"}
               </span>
             </div>
+            {runsState.loadingId === m.id && <span className="muted small">…</span>}
             <div className="history-actions">
               <button onClick={() => void runNow(m.id)}>{t("monitoring.run")}</button>
               <button onClick={() => void toggle(m.id)}>{m.enabled ? t("monitoring.toggle") : t("monitoring.resume")}</button>
               <button onClick={() => void remove(m.id)}>{t("monitoring.delete")}</button>
+              <button onClick={() => void loadRuns(m.id)}>{t("monitoring.runs")}</button>
             </div>
+            {runsState.runs[m.id] && (
+              <ul className="monitor-runs">
+                {runsState.runs[m.id]!.length === 0 ? (
+                  <li className="muted">{t("monitoring.noRuns")}</li>
+                ) : (
+                  runsState.runs[m.id]!.map((r) => (
+                    <li key={r.id}>
+                      <span className={`status-pill ${r.status === "ok" ? "status-pill--good" : "status-pill--poor"}`}>
+                        {r.status === "ok" ? "✓ ok" : "✕ erro"}
+                      </span>
+                      <span>{date(r.startedAt)}</span>
+                      <span className="muted">
+                        {r.status === "ok" ? `${r.alertsCreated} ${t("alerts.title").toLowerCase()}` : r.message}
+                      </span>
+                      <span className="muted">· {(r.durationMs / 1000).toFixed(1)} s</span>
+                    </li>
+                  ))
+                )}
+              </ul>
+            )}
           </li>
         ))}
       </ul>

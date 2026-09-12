@@ -8,6 +8,7 @@ import type {
   GoalRecord,
   GoalOperator,
   MonitorRecord,
+  MonitorRunRecord,
   ProjectRecord,
   RequestStrategy,
   SiteRecord,
@@ -96,13 +97,14 @@ export function createSite(name: string, url: string): Promise<SiteRecord> {
 
 export function getSiteAnalyses(
   siteId: string,
-  params?: { strategy?: Strategy; from?: string; to?: string; limit?: number }
+  params?: { strategy?: Strategy; from?: string; to?: string; limit?: number; includeMetrics?: boolean }
 ): Promise<{ site: SiteRecord; analyses: AnalysisSummary[] }> {
   const query = new URLSearchParams();
   if (params?.strategy) query.set("strategy", params.strategy);
   if (params?.from) query.set("from", params.from);
   if (params?.to) query.set("to", params.to);
   if (params?.limit !== undefined) query.set("limit", String(params.limit));
+  if (params?.includeMetrics) query.set("includeMetrics", "true");
   const qs = query.toString();
   return fetchJson(`/sites/${siteId}/analyses${qs ? `?${qs}` : ""}`);
 }
@@ -192,6 +194,10 @@ export function runMonitorNow(id: string): Promise<{ analysisId: string; alertsC
 
 export function deleteMonitor(id: string): Promise<void> {
   return fetchJson(`/monitoring/${id}`, { method: "DELETE" });
+}
+
+export function listMonitorRuns(monitorId: string, limit = 10): Promise<MonitorRunRecord[]> {
+  return fetchJson(`/monitoring/${monitorId}/runs?limit=${limit}`);
 }
 
 // ──────────────── V4 Alerts ────────────────

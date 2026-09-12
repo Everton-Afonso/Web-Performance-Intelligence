@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 /**
  * Lightweight i18n foundation (RNF-12).
  *
@@ -57,6 +59,15 @@ const messages: Record<Locale, Record<string, string>> = {
     "chart.stable": "estável",
     "nav.analyze": "Nova análise",
     "nav.sites": "Meus sites",
+    "nav.overview": "Overview",
+    "nav.history": "Histórico",
+    "nav.comparisons": "Comparações",
+    "nav.reports": "Relatórios",
+    "nav.goals": "Metas",
+    "nav.settings": "Configurações",
+    "nav.projects": "Projetos",
+    "nav.monitoring": "Monitoramento",
+    "nav.alerts": "Alertas",
     "sites.title": "Sites cadastrados",
     "sites.empty": "Nenhum site cadastrado.",
     "sites.form.name": "Nome do site",
@@ -126,6 +137,8 @@ const messages: Record<Locale, Record<string, string>> = {
     "monitoring.toggle": "Pausar",
     "monitoring.resume": "Retomar",
     "monitoring.delete": "Excluir",
+    "monitoring.runs": "Execuções",
+    "monitoring.noRuns": "Nenhuma execução ainda.",
     "alerts.title": "Alertas",
     "alerts.unread": "Não lidos",
     "alerts.markAllRead": "Marcar todos como lidos",
@@ -162,7 +175,33 @@ const messages: Record<Locale, Record<string, string>> = {
     "wpt.req.host": "Host",
     "wpt.req.type": "Tipo",
     "wpt.req.load": "Load",
-    "wpt.req.bytes": "Bytes"
+    "wpt.req.bytes": "Bytes",
+    "ov.lastAnalysis": "última análise",
+    "ov.runAnalysis": "Run analysis",
+    "ov.compare": "Compare",
+    "ov.generateReport": "Generate report",
+    "ov.previous": "Previous",
+    "ov.current": "Current",
+    "ov.goal": "Goal",
+    "ov.passing": "Core Web Vitals passing",
+    "ov.empty": "Nenhuma análise ainda",
+    "ov.emptyHint": "Rode a primeira análise para liberar o Overview executivo com tendências, comparações e insights.",
+    "ov.coreWebVitals": "Core Web Vitals",
+    "ov.priorityIssues": "Priority issues",
+    "ov.pageWeight": "Page Weight",
+    "ov.thirdParty": "Third-party impact",
+    "ov.actionPlan": "Generate action plan",
+    "ov.best": "Best",
+    "ov.worst": "Worst",
+    "ov.avg": "Average",
+    "history.compareSelected": "Comparar selecionados",
+    "history.allSites": "Todos os sites",
+    "history.site": "Site",
+    "history.filterStatus": "Status",
+    "history.table.device": "Dispositivo",
+    "history.table.issues": "Problemas",
+    "report.type": "Tipo de relatório",
+    "status.unavailable": "Não disponível"
   },
   "en-US": {
     "app.title": "Web Performance Intelligence",
@@ -212,6 +251,15 @@ const messages: Record<Locale, Record<string, string>> = {
     "chart.stable": "stable",
     "nav.analyze": "New analysis",
     "nav.sites": "My sites",
+    "nav.overview": "Overview",
+    "nav.history": "History",
+    "nav.comparisons": "Comparisons",
+    "nav.reports": "Reports",
+    "nav.goals": "Goals",
+    "nav.settings": "Settings",
+    "nav.projects": "Projects",
+    "nav.monitoring": "Monitoring",
+    "nav.alerts": "Alerts",
     "sites.title": "Registered sites",
     "sites.empty": "No site registered yet.",
     "sites.form.name": "Site name",
@@ -281,6 +329,8 @@ const messages: Record<Locale, Record<string, string>> = {
     "monitoring.toggle": "Pause",
     "monitoring.resume": "Resume",
     "monitoring.delete": "Delete",
+    "monitoring.runs": "Runs",
+    "monitoring.noRuns": "No runs yet.",
     "alerts.title": "Alerts",
     "alerts.unread": "Unread",
     "alerts.markAllRead": "Mark all as read",
@@ -317,14 +367,69 @@ const messages: Record<Locale, Record<string, string>> = {
     "wpt.req.host": "Host",
     "wpt.req.type": "Type",
     "wpt.req.load": "Load",
-    "wpt.req.bytes": "Bytes"
+    "wpt.req.bytes": "Bytes",
+    "ov.lastAnalysis": "last analysis",
+    "ov.runAnalysis": "Run analysis",
+    "ov.compare": "Compare",
+    "ov.generateReport": "Generate report",
+    "ov.previous": "Previous",
+    "ov.current": "Current",
+    "ov.goal": "Goal",
+    "ov.passing": "Core Web Vitals passing",
+    "ov.empty": "No analysis yet",
+    "ov.emptyHint": "Run the first analysis to unlock the executive Overview with trends, comparisons and insights.",
+    "ov.coreWebVitals": "Core Web Vitals",
+    "ov.priorityIssues": "Priority issues",
+    "ov.pageWeight": "Page Weight",
+    "ov.thirdParty": "Third-party impact",
+    "ov.actionPlan": "Generate action plan",
+    "ov.best": "Best",
+    "ov.worst": "Worst",
+    "ov.avg": "Average",
+    "history.compareSelected": "Compare selected",
+    "history.allSites": "All sites",
+    "history.site": "Site",
+    "history.filterStatus": "Status",
+    "history.table.device": "Device",
+    "history.table.issues": "Issues",
+    "report.type": "Report type",
+    "status.unavailable": "Not available"
   }
 };
 
 const DEFAULT_LOCALE: Locale = "pt-BR";
 
-export function useI18n(locale: Locale = DEFAULT_LOCALE) {
-  const dict = messages[locale] ?? messages[DEFAULT_LOCALE];
+const STORAGE_KEY = "wpintel:locale";
+
+export function persistLocale(locale: Locale): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, locale);
+  } catch {
+    // ignore private mode
+  }
+  window.dispatchEvent(new CustomEvent("wpintel:locale"));
+}
+
+function readPersistedLocale(): Locale {
+  try {
+    const v = localStorage.getItem(STORAGE_KEY);
+    if (v === "pt-BR" || v === "en-US") return v;
+  } catch {
+    // ignore
+  }
+  return DEFAULT_LOCALE;
+}
+
+export function useI18n(locale?: Locale) {
+  const [persisted, setPersisted] = useState(readPersistedLocale);
+
+  useEffect(() => {
+    const onChange = () => setPersisted(readPersistedLocale());
+    window.addEventListener("wpintel:locale", onChange);
+    return () => window.removeEventListener("wpintel:locale", onChange);
+  }, []);
+
+  const dict = messages[locale ?? persisted] ?? messages[DEFAULT_LOCALE];
 
   function t(key: string): string {
     return dict[key] ?? key;
